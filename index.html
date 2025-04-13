@@ -1606,19 +1606,53 @@
     <div id="copyNotification" class="copy-notification" style="display:none"></div>
 
     <script>
-        // Configuración modificada para GitHub Pages
+        // Configuración con CORS proxy para GitHub Pages
+        const corsProxy = "https://cors-anywhere.herokuapp.com/";
         const embyConfig = { 
             apiKey: 'd4f8955e60014f1d910f302a822544ec', 
-            serverUrl: prompt('Ingrese la URL de su servidor Emby (incluyendo http:// y puerto):') || 'http://localhost:8096',
+            localUrl: 'http://192.168.1.65:8096', 
+            remoteUrl: 'http://mxcuentas.ddns.net:8096', 
+            currentUrl: null, 
             localStorageKey: 'embyUsers' 
         };
-        
         const jellyfinConfig = { 
             apiKey: '3bfb740b86be49a0bd1b6a0771c0020a', 
-            serverUrl: prompt('Ingrese la URL de su servidor Jellyfin (incluyendo http:// y puerto):') || 'http://localhost:8096',
+            localUrl: 'http://192.168.1.65:8081', 
+            remoteUrl: 'http://mxcuentas.ddns.net:8081', 
+            currentUrl: null, 
             localStorageKey: 'jellyfinUsers' 
         };
         
+        // Función para manejar solicitudes con CORS
+        async function fetchWithCORS(url, options = {}) {
+            try {
+                // Si estamos en GitHub Pages (https), usamos el proxy CORS
+                if (window.location.protocol === 'https:') {
+                    const proxiedUrl = corsProxy + url.replace(/^https?:\/\//, '');
+                    const response = await fetch(proxiedUrl, {
+                        ...options,
+                        headers: {
+                            ...options.headers,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        // Si falla con proxy, intentamos sin proxy (puede fallar por CORS)
+                        console.log('Falló con proxy CORS, intentando directo...');
+                        return await fetch(url, options);
+                    }
+                    return response;
+                } else {
+                    // Si no es GitHub Pages (http local), hacemos la solicitud directa
+                    return await fetch(url, options);
+                }
+            } catch (error) {
+                console.error('Error en fetchWithCORS:', error);
+                throw error;
+            }
+        }
+
         const extendModal = document.getElementById('extendModal'), 
               closeModal = document.querySelector('.close-modal'), 
               cancelExtend = document.getElementById('cancelExtend'), 
@@ -1629,9 +1663,24 @@
             currentExtendService = null, 
             embyUsers = cargarUsuariosDesdeLocalStorage('emby'), 
             jellyfinUsers = cargarUsuariosDesdeLocalStorage('jellyfin'), 
-            deviceCleanerState = { autoCleanInterval: null };
+            deviceCleanerState = { autoCleanInterval: null, currentUrl: null };
 
-        // Funciones básicas
+        async function esRedLocal(url) { 
+            try { 
+                const response = await fetchWithCORS(url, { method: 'HEAD' }); 
+                return true 
+            } catch (error) { 
+                return false 
+            } 
+        }
+        
+        async function obtenerUrlServidor(config) { 
+            const enLocal = await esRedLocal(config.localUrl); 
+            console.log('Estamos en red local:', enLocal); 
+            config.currentUrl = enLocal ? config.localUrl : config.remoteUrl; 
+            return config.currentUrl 
+        }
+        
         function guardarUsuarios(usuarios, service) { 
             localStorage.setItem(service === 'emby' ? embyConfig.localStorageKey : jellyfinConfig.localStorageKey, JSON.stringify(usuarios)) 
         }
@@ -1686,7 +1735,7 @@
         }
         
         function copiarInstruccionesTV(email, password) { 
-            const texto = `🎟️ *Activación de tv* 🎟️\n\n1.- Ingresaremos a emby en la tv:\n2.- Seleccionaremos:  *SKIP, OMITIR o saltar e introducir la dirección IP*\n\n*add server o conectar al servidor*\nHost o equipo: ${embyConfig.serverUrl.replace('http://', '').replace(':8096', '')}\nPort: 8096\nSeleccionaremos: *Connect, siguente o  ok*\n\nSeleccionaremos Ingresar usuario manualmente: \n\n📧 Nombre del usuario: ${email || '[correo del usuario]'}\n🔐 Contraseña del usuario: ${password || '[contraseña usuario]'}\n\nQuedará activada su tv\n\n*Recomendación si te pide ingresar los datos del usuario y contraseña, al ingresar nuevamente a EMBY*\n\nVolveremos a iniciar sesión con los datos proporcionados \nCorreo y contraseña\n\nDentro de la interfaz de emby seleccionaremos el icono de:  ajustes ⚙️ \nEn el menú de configuración seleccionaremos \n1.- INICIO  \n2.- Estado de inicio (mostrar inicio de sesión)\n3.- Seleccionaremos (Inicio de sesión auto. Con este usuario)\n\nCuando ingresé nuevamente a EMBY cargará en automático la interfaz. 😀.`; 
+            const texto = `🎟️ *Activación de tv* 🎟️\n\n1.- Ingresaremos a emby en la tv:\n2.- Seleccionaremos:  *SKIP, OMITIR o saltar e introducir la dirección IP*\n\n*add server o conectar al servidor*\nHost o equipo: mxcuentas.ddns.net\nPort: 8096\nSeleccionaremos: *Connect, siguente o  ok*\n\nSeleccionaremos Ingresar usuario manualmente: \n\n📧 Nombre del usuario: ${email || '[correo del usuario]'}\n🔐 Contraseña del usuario: ${password || '[contraseña usuario]'}\n\nQuedará activada su tv\n\n*Recomendación si te pide ingresar los datos del usuario y contraseña, al ingresar nuevamente a EMBY*\n\nVolveremos a iniciar sesión con los datos proporcionados \nCorreo y contraseña\n\nDentro de la interfaz de emby seleccionaremos el icono de:  ajustes ⚙️ \nEn el menú de configuración seleccionaremos \n1.- INICIO  \n2.- Estado de inicio (mostrar inicio de sesión)\n3.- Seleccionaremos (Inicio de sesión auto. Con este usuario)\n\nCuando ingresé nuevamente a EMBY cargará en automático la interfaz. 😀.`; 
             navigator.clipboard.writeText(texto).then(() => { 
                 mostrarNotificacion('Instrucciones para TV copiadas al portapapeles') 
             }).catch(err => { 
@@ -1696,7 +1745,7 @@
         }
         
         function copiarInstruccionesMobile(email, password) { 
-            const texto = `🎟️ *Activación de CELULAR* 🎟️\n\nIngresaremos a la aplicación *EMBY* en nuestro celular: \n1.-  Seleccionaremos *Next*\n2.-  Seleccionaremos *Skip*\n\nNos va a solicitar los datos para acceder al servidor EMBY:\n\n*Connect to Server*\n*Host:* ${embyConfig.serverUrl.replace('http://', '').replace(':8096', '')}\n*Port:* 8096\nSeleccionaremos: *Connect o ok*\n\nSeleccionaremos Ingresar usuario manualmente: \n\n*📧 User name:* ${email || '[correo del usuario]'}\n*🔐 Password:* ${password || '[contraseña usuario]'}\n*Seleccionaremos:* Sing In\n\nQuedará activado su celular.\nPor favor de instalar está versión de la aplicación en sus dispositivos móvil :\n*APK EMBY*\nhttps://drive.google.com/file/d/17ynmVbzhmlWsaZXCYHanKH9vZ5eEVX9u/view?usp=drivesdk`; 
+            const texto = `🎟️ *Activación de CELULAR* 🎟️\n\nIngresaremos a la aplicación *EMBY* en nuestro celular: \n1.-  Seleccionaremos *Next*\n2.-  Seleccionaremos *Skip*\n\nNos va a solicitar los datos para acceder al servidor EMBY:\n\n*Connect to Server*\n*Host:* mxcuentas.ddns.net\n*Port:* 8096\nSeleccionaremos: *Connect o ok*\n\nSeleccionaremos Ingresar usuario manualmente: \n\n*📧 User name:* ${email || '[correo del usuario]'}\n*🔐 Password:* ${password || '[contraseña usuario]'}\n*Seleccionaremos:* Sing In\n\nQuedará activado su celular.\nPor favor de instalar está versión de la aplicación en sus dispositivos móvil :\n*APK EMBY*\nhttps://drive.google.com/file/d/17ynmVbzhmlWsaZXCYHanKH9vZ5eEVX9u/view?usp=drivesdk`; 
             navigator.clipboard.writeText(texto).then(() => { 
                 mostrarNotificacion('Instrucciones para Celular copiadas al portapapeles') 
             }).catch(err => { 
@@ -1706,7 +1755,7 @@
         }
         
         function copiarInstruccionesTVJellyfin(email, password) { 
-            const texto = `🎟️ *Activación de tv* 🎟️\n\nInstalaremos la aplicación en nuestro dispositivo\nNos va a solicitar el nombre del servidor: \n${jellyfinConfig.serverUrl.replace('http://', '').replace(':8096', '')}:8081\n\nAl ingresar nos solicitará Usuario y contraseña:\n*Usuario:* ${email || '[correo del usuario]'}\n*Password:* ${password || '[contraseña del usuario]'}\n\nQuedará activada su TV.`; 
+            const texto = `🎟️ *Activación de tv* 🎟️\n\nInstalaremos la aplicación en nuestro dispositivo\nNos va a solicitar el nombre del servidor: \nmxcuentas.ddns.net:8081\n\nAl ingresar nos solicitará Usuario y contraseña:\n*Usuario:* ${email || '[correo del usuario]'}\n*Password:* ${password || '[contraseña del usuario]'}\n\nQuedará activada su TV.`; 
             navigator.clipboard.writeText(texto).then(() => { 
                 mostrarNotificacion('Instrucciones para TV (Jellyfin) copiadas al portapapeles') 
             }).catch(err => { 
@@ -1716,7 +1765,7 @@
         }
         
         function copiarInstruccionesMobileJellyfin(email, password) { 
-            const texto = `🎟️ *Activación de CELULAR* 🎟️\nInstalaremos la aplicación en nuestro dispositivo\nNos va a solicitar el nombre del servidor: \n${jellyfinConfig.serverUrl.replace('http://', '').replace(':8096', '')}:8081\n\nAl ingresar nos solicitará Usuario y contraseña:\n*Usuario:* ${email || '[correo del usuario]'}\n*Password:* ${password || '[contraseña del usuario]'}\n\nQuedará activado su celular.`; 
+            const texto = `🎟️ *Activación de CELULAR* 🎟️\nInstalaremos la aplicación en nuestro dispositivo\nNos va a solicitar el nombre del servidor: \nmxcuentas.ddns.net:8081\n\nAl ingresar nos solicitará Usuario y contraseña:\n*Usuario:* ${email || '[correo del usuario]'}\n*Password:* ${password || '[contraseña del usuario]'}\n\nQuedará activado su celular.`; 
             navigator.clipboard.writeText(texto).then(() => { 
                 mostrarNotificacion('Instrucciones para Celular (Jellyfin) copiadas al portapapeles') 
             }).catch(err => { 
@@ -1733,8 +1782,7 @@
                 notification.style.display = 'none' 
             }, 3000) 
         }
-
-        // Funciones para Emby
+        
         function crearTarjetaUsuarioEmby(usuario) { 
             const { diasRestantes, estado, estadoClass, diasClass } = calcularEstado(usuario.endDate); 
             const estadoHTML = `<span class="user-status ${estadoClass}">${estado === 'active' ? 'Activo' : estado === 'warning' ? (diasRestantes === 'No definido' ? 'Sin configurar' : 'Por expirar') : 'Expirado'}</span>`; 
@@ -1751,27 +1799,18 @@
                     <div>
                         <div class="user-name" contenteditable="true" onblur="actualizarNombreUsuario('${usuario.id}',this.textContent,'emby')">${usuario.name || 'Sin nombre'}</div>
                         <div class="user-email">${usuario.email}</div>
-                        ${usuario.phone ? 
-                            `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'emby')"><i class="fas fa-phone"></i> ${usuario.phone}</div>` : 
-                            `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'emby')" style="color:var(--text-light)"><i class="fas fa-phone"></i> Agregar teléfono</div>`
-                        }
+                        ${usuario.phone ? `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'emby')"><i class="fas fa-phone"></i> ${usuario.phone}</div>` : `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'emby')" style="color:var(--text-light)"><i class="fas fa-phone"></i> Agregar teléfono</div>`}
                     </div>
                     ${estadoHTML}
                 </div>
                 <div class="user-dates">
                     <div class="date-item">
                         <span class="date-label">Inicio:</span>
-                        ${esNoDefinido ? 
-                            `<input type="date" class="date-input" value="${startDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','startDate',this.value,'emby')">` : 
-                            `<span class="date-value">${formatearFecha(usuario.startDate)}</span>`
-                        }
+                        ${esNoDefinido ? `<input type="date" class="date-input" value="${startDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','startDate',this.value,'emby')">` : `<span class="date-value">${formatearFecha(usuario.startDate)}</span>`}
                     </div>
                     <div class="date-item">
                         <span class="date-label">Fin:</span>
-                        ${esNoDefinido ? 
-                            `<input type="date" class="date-input" value="${endDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','endDate',this.value,'emby')">` : 
-                            `<span class="date-value">${formatearFecha(usuario.endDate)}</span>`
-                        }
+                        ${esNoDefinido ? `<input type="date" class="date-input" value="${endDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','endDate',this.value,'emby')">` : `<span class="date-value">${formatearFecha(usuario.endDate)}</span>`}
                     </div>
                 </div>
                 <div class="user-footer">
@@ -1886,9 +1925,10 @@
         async function eliminarUsuarioEmby(userId) { 
             if (confirm('¿Estás seguro de eliminar este usuario de Emby? Esta acción no se puede deshacer.')) { 
                 try { 
-                    const response = await fetch(`${embyConfig.serverUrl}/emby/Users/${userId}?api_key=${embyConfig.apiKey}`, { 
-                        method: 'DELETE' 
-                    }); 
+                    const urlServidor = await obtenerUrlServidor(embyConfig), 
+                          response = await fetchWithCORS(`${urlServidor}/emby/Users/${userId}?api_key=${embyConfig.apiKey}`, { 
+                              method: 'DELETE' 
+                          }); 
                     if (response.ok) { 
                         embyUsers = embyUsers.filter(u => u.id !== userId); 
                         guardarUsuarios(embyUsers, 'emby'); 
@@ -1906,7 +1946,8 @@
         
         async function obtenerUsuariosActivosEmby() { 
             try { 
-                const response = await fetch(`${embyConfig.serverUrl}/emby/Sessions?api_key=${embyConfig.apiKey}`); 
+                const urlServidor = await obtenerUrlServidor(embyConfig), 
+                      response = await fetchWithCORS(`${urlServidor}/emby/Sessions?api_key=${embyConfig.apiKey}`); 
                 if (!response.ok) throw new Error('Error al obtener sesiones activas de Emby'); 
                 const sessions = await response.json(); 
                 return sessions.filter(session => session.NowPlayingItem) 
@@ -1917,22 +1958,19 @@
         }
         
         function crearTarjetaUsuarioActivoEmby(session) { 
-            const usuario = embyUsers.find(u => u.id === session.UserId) || { 
-                    name: session.UserName || 'Usuario desconocido', 
-                    email: session.UserName || 'sin-email' 
-                }, 
-                nowPlaying = session.NowPlayingItem, 
-                positionTicks = session.PlayState ? session.PlayState.PositionTicks || 0 : 0, 
-                runtimeTicks = nowPlaying.RunTimeTicks || 1, 
-                progress = Math.min(100, Math.round((positionTicks / runtimeTicks) * 100)), 
-                runtime = Math.floor(runtimeTicks / 10000000 / 60), 
-                currentPosition = Math.floor(positionTicks / 10000000), 
-                formatTime = seconds => { 
-                    const hrs = Math.floor(seconds / 3600), 
-                          mins = Math.floor((seconds % 3600) / 60), 
-                          secs = Math.floor(seconds % 60); 
-                    return `${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s` 
-                }; 
+            const usuario = embyUsers.find(u => u.id === session.UserId) || { name: session.UserName || 'Usuario desconocido', email: session.UserName || 'sin-email' }, 
+                  nowPlaying = session.NowPlayingItem, 
+                  positionTicks = session.PlayState ? session.PlayState.PositionTicks || 0 : 0, 
+                  runtimeTicks = nowPlaying.RunTimeTicks || 1, 
+                  progress = Math.min(100, Math.round((positionTicks / runtimeTicks) * 100)), 
+                  runtime = Math.floor(runtimeTicks / 10000000 / 60), 
+                  currentPosition = Math.floor(positionTicks / 10000000), 
+                  formatTime = seconds => { 
+                      const hrs = Math.floor(seconds / 3600), 
+                            mins = Math.floor((seconds % 3600) / 60), 
+                            secs = Math.floor(seconds % 60); 
+                      return `${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s` 
+                  }; 
             
             let itemType = '', 
                 icon = '', 
@@ -1946,7 +1984,7 @@
                 mainTitle = nowPlaying.Name || 'Película sin título'; 
                 subtitle = itemType; 
                 if (nowPlaying.ImageTags && nowPlaying.ImageTags.Primary) { 
-                    coverUrl = `${embyConfig.serverUrl}/emby/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` 
+                    coverUrl = `${embyConfig.currentUrl}/emby/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` 
                 } 
             } else if (nowPlaying.Type === 'Episode') { 
                 itemType = 'Serie'; 
@@ -1961,7 +1999,7 @@
                 } 
                 const seriesId = nowPlaying.SeriesId || nowPlaying.ParentBackdropItemId; 
                 if (seriesId) { 
-                    coverUrl = `${embyConfig.serverUrl}/emby/Items/${seriesId}/Images/Primary?maxHeight=200&quality=90` 
+                    coverUrl = `${embyConfig.currentUrl}/emby/Items/${seriesId}/Images/Primary?maxHeight=200&quality=90` 
                 } 
             } else { 
                 itemType = 'Contenido'; 
@@ -1969,7 +2007,7 @@
                 mainTitle = nowPlaying.Name || 'Contenido sin título'; 
                 subtitle = itemType; 
                 if (nowPlaying.ImageTags && nowPlaying.ImageTags.Primary) { 
-                    coverUrl = `${embyConfig.serverUrl}/emby/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` 
+                    coverUrl = `${embyConfig.currentUrl}/emby/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` 
                 } 
             } 
             
@@ -1984,10 +2022,7 @@
                 </div>
                 <div class="now-playing-content">
                     <div class="media-cover">
-                        ${coverUrl ? 
-                            `<img src="${coverUrl}" alt="${mainTitle}">` : 
-                            `<div class="media-cover-placeholder"><i class="fas fa-image"></i></div>`
-                        }
+                        ${coverUrl ? `<img src="${coverUrl}" alt="${mainTitle}">` : `<div class="media-cover-placeholder"><i class="fas fa-image"></i></div>`}
                     </div>
                     <div class="media-info">
                         <div class="media-title">${mainTitle}</div>
@@ -2011,16 +2046,14 @@
                                 <div style="color:var(--text-light)">Dispositivo</div>
                                 <div>${session.DeviceName || 'Desconocido'}</div>
                             </div>
-                            ${session.Client ? `
-                                <div>
-                                    <div style="color:var(--text-light)">Cliente</div>
-                                    <div>${session.Client}</div>
-                                </div>` : ''}
-                            ${session.PlayState && session.PlayState.PlayMethod ? `
-                                <div>
-                                    <div style="color:var(--text-light)">Método</div>
-                                    <div>${session.PlayState.PlayMethod === 'Transcode' ? 'Transcodificado' : 'Directo'}</div>
-                                </div>` : ''}
+                            ${session.Client ? `<div>
+                                <div style="color:var(--text-light)">Cliente</div>
+                                <div>${session.Client}</div>
+                            </div>` : ''}
+                            ${session.PlayState && session.PlayState.PlayMethod ? `<div>
+                                <div style="color:var(--text-light)">Método</div>
+                                <div>${session.PlayState.PlayMethod === 'Transcode' ? 'Transcodificado' : 'Directo'}</div>
+                            </div>` : ''}
                         </div>
                     </div>
                 </div>
@@ -2029,7 +2062,8 @@
         
         async function actualizarProgresoEnTiempoRealEmby() { 
             try { 
-                const response = await fetch(`${embyConfig.serverUrl}/emby/Sessions?api_key=${embyConfig.apiKey}`); 
+                const urlServidor = await obtenerUrlServidor(embyConfig), 
+                      response = await fetchWithCORS(`${urlServidor}/emby/Sessions?api_key=${embyConfig.apiKey}`); 
                 if (!response.ok) return; 
                 const sessions = await response.json(), 
                       activeSessions = sessions.filter(session => session.NowPlayingItem); 
@@ -2037,7 +2071,6 @@
                 activeSessions.forEach(session => { 
                     const card = document.querySelector(`.user-card[data-session-id="${session.Id}"]`); 
                     if (!card) return; 
-                    
                     const nowPlaying = session.NowPlayingItem, 
                           positionTicks = session.PlayState ? session.PlayState.PositionTicks || 0 : 0, 
                           runtimeTicks = nowPlaying.RunTimeTicks || 1, 
@@ -2049,7 +2082,6 @@
                         if (Math.abs(currentProgress - progress) >= 1) { 
                             progressBar.style.width = `${progress}%`; 
                             progressBar.dataset.progress = progress; 
-                            
                             const currentPosition = Math.floor(positionTicks / 10000000), 
                                   runtime = Math.floor(runtimeTicks / 10000000), 
                                   formatTime = seconds => { 
@@ -2081,7 +2113,6 @@
             const activeSessions = await obtenerUsuariosActivosEmby(), 
                   container = document.getElementById('embyActiveUsersContainer'), 
                   emptyState = document.getElementById('embyNoActiveUsers'); 
-            
             container.innerHTML = ''; 
             document.getElementById('embyActiveUsersCount').textContent = activeSessions.length; 
             document.getElementById('embyModalActiveCount').textContent = activeSessions.length; 
@@ -2099,13 +2130,12 @@
         
         async function cargarUsuariosEmby() { 
             try { 
-                console.log('Usando URL del servidor de Emby:', embyConfig.serverUrl); 
-                const response = await fetch(`${embyConfig.serverUrl}/emby/Users?api_key=${embyConfig.apiKey}`); 
+                const urlServidor = await obtenerUrlServidor(embyConfig); 
+                console.log('Usando URL del servidor de Emby:', urlServidor); 
+                const response = await fetchWithCORS(`${urlServidor}/emby/Users?api_key=${embyConfig.apiKey}`); 
                 if (!response.ok) throw new Error('Error al obtener usuarios de Emby'); 
-                
                 const data = await response.json(), 
                       container = document.getElementById('embyUsersContainer'); 
-                
                 container.innerHTML = ''; 
                 const emptyState = document.getElementById('embyEmptyState'); 
                 
@@ -2148,7 +2178,6 @@
         function filtrarUsuariosEmby(searchTerm) { 
             const cards = document.querySelectorAll('#embyUsersContainer .user-card'); 
             let visibleCount = 0; 
-            
             cards.forEach(card => { 
                 const name = card.querySelector('.user-name').textContent.toLowerCase(), 
                       email = card.querySelector('.user-email').textContent.toLowerCase(), 
@@ -2178,7 +2207,182 @@
             } 
         }
         
-        // Funciones para Jellyfin
+        async function detectNetworkForCleaner() { 
+            try { 
+                const testUrl = embyConfig.localUrl + '/System/Info/Public', 
+                      response = await fetchWithCORS(testUrl, { 
+                          headers: { 'X-Emby-Token': embyConfig.apiKey } 
+                      }).catch(() => null); 
+                
+                if (response && response.ok) { 
+                    deviceCleanerState.currentUrl = embyConfig.localUrl; 
+                    showNetworkStatus('Conectado a la red local (LAN)', 'success') 
+                } else { 
+                    deviceCleanerState.currentUrl = embyConfig.remoteUrl; 
+                    showNetworkStatus('Conectado a la red remota (WAN)', 'info') 
+                } 
+                loadDevices() 
+            } catch (error) { 
+                console.error('Error al detectar red:', error); 
+                showNetworkStatus('No se pudo conectar a Emby', 'error') 
+            } 
+        }
+        
+        function showNetworkStatus(message, type) { 
+            const networkStatus = document.getElementById('networkStatusEmby'); 
+            networkStatus.textContent = `Estado de conexión: ${message}`; 
+            networkStatus.className = `network-status status-${type}`; 
+            networkStatus.style.display = 'block' 
+        }
+        
+        function showCleanerStatus(message, type) { 
+            const statusElement = document.getElementById('statusEmbyDevices'); 
+            statusElement.textContent = message; 
+            statusElement.className = `status-message status-${type}`; 
+            statusElement.style.display = 'block'; 
+            if (type !== 'error') { 
+                setTimeout(() => { 
+                    statusElement.style.display = 'none' 
+                }, 5000) 
+            } 
+        }
+        
+        async function loadDevices() { 
+            if (!deviceCleanerState.currentUrl) { 
+                showCleanerStatus('Esperando detección de red...', 'info'); 
+                return 
+            } 
+            try { 
+                showCleanerStatus('Cargando dispositivos...', 'info'); 
+                const response = await fetchWithCORS(`${deviceCleanerState.currentUrl}/Devices`, { 
+                    headers: { 'X-Emby-Token': embyConfig.apiKey } 
+                }); 
+                
+                if (!response.ok) { 
+                    throw new Error(`Error ${response.status}: ${response.statusText}`) 
+                } 
+                
+                const devices = await response.json(); 
+                displayDevices(devices.Items); 
+                showCleanerStatus(`${devices.Items.length} dispositivos cargados`, 'success') 
+            } catch (error) { 
+                console.error('Error al cargar dispositivos:', error); 
+                showCleanerStatus(`Error: ${error.message}`, 'error'); 
+                document.getElementById('devicesEmby').innerHTML = `Error al cargar dispositivos: ${error.message}` 
+            } 
+        }
+        
+        function displayDevices(devices) { 
+            const now = new Date(), 
+                  container = document.getElementById('devicesEmby'); 
+            container.innerHTML = ''; 
+            
+            if (devices.length === 0) { 
+                container.innerHTML = '<div class="device-item">No hay dispositivos</div>'; 
+                return 
+            } 
+            
+            devices.sort((a, b) => new Date(a.DateLastActivity || 0) - new Date(b.DateLastActivity || 0)); 
+            
+            devices.forEach(device => { 
+                const lastActive = device.DateLastActivity ? new Date(device.DateLastActivity) : null, 
+                      minutesInactive = lastActive ? Math.floor((now - lastActive) / (1000 * 60)) : null, 
+                      isInactive = minutesInactive !== null && minutesInactive > 10, 
+                      deviceElement = document.createElement('div'); 
+                
+                deviceElement.className = `device-item ${isInactive ? 'to-delete' : ''}`; 
+                deviceElement.innerHTML = `
+                    <div class="device-info">
+                        <div class="device-name">${device.Name || 'Desconocido'}</div>
+                        <div class="device-details">
+                            <span>ID: ${device.Id}</span>
+                            ${lastActive ? `
+                                <span>Última actividad: ${lastActive.toLocaleString()}</span>
+                                <span>Inactivo: ${minutesInactive} minutos</span>
+                            ` : '<span>Nunca activo</span>'}
+                        </div>
+                    </div>
+                `; 
+                container.appendChild(deviceElement) 
+            }) 
+        }
+        
+        async function cleanInactiveDevices() { 
+            if (!deviceCleanerState.currentUrl) { 
+                showCleanerStatus('Esperando detección de red...', 'info'); 
+                return 
+            } 
+            try { 
+                showCleanerStatus('Buscando dispositivos inactivos...', 'info'); 
+                const response = await fetchWithCORS(`${deviceCleanerState.currentUrl}/Devices`, { 
+                    headers: { 'X-Emby-Token': embyConfig.apiKey } 
+                }); 
+                
+                if (!response.ok) { 
+                    throw new Error(`Error ${response.status}: ${response.statusText}`) 
+                } 
+                
+                const devices = await response.json(), 
+                      now = new Date(), 
+                      inactiveDevices = devices.Items.filter(device => { 
+                          if (!device.DateLastActivity) return true; 
+                          const lastActive = new Date(device.DateLastActivity), 
+                                minutesInactive = Math.floor((now - lastActive) / (1000 * 60)); 
+                          return minutesInactive > 10 
+                      }); 
+                
+                if (inactiveDevices.length === 0) { 
+                    showCleanerStatus('No hay dispositivos inactivos para eliminar', 'info'); 
+                    return 
+                } 
+                
+                showCleanerStatus(`Eliminando ${inactiveDevices.length} dispositivos inactivos...`, 'info'); 
+                let deletedCount = 0; 
+                
+                for (const device of inactiveDevices) { 
+                    try { 
+                        const deleteResponse = await fetchWithCORS(`${deviceCleanerState.currentUrl}/Devices`, { 
+                            method: 'DELETE', 
+                            headers: { 
+                                'X-Emby-Token': embyConfig.apiKey, 
+                                'Content-Type': 'application/json' 
+                            }, 
+                            body: JSON.stringify({ Id: device.Id }) 
+                        }); 
+                        
+                        if (deleteResponse.ok) { 
+                            deletedCount++ 
+                        } else { 
+                            console.error(`Error al eliminar dispositivo ${device.Id}:`, deleteResponse.statusText) 
+                        } 
+                    } catch (error) { 
+                        console.error(`Error al eliminar dispositivo ${device.Id}:`, error) 
+                    } 
+                } 
+                
+                showCleanerStatus(`Se eliminaron ${deletedCount} dispositivos inactivos`, 'success'); 
+                loadDevices() 
+            } catch (error) { 
+                console.error('Error al limpiar dispositivos:', error); 
+                showCleanerStatus(`Error: ${error.message}`, 'error') 
+            } 
+        }
+        
+        function setupAutoClean(minutes) { 
+            if (deviceCleanerState.autoCleanInterval) { 
+                clearInterval(deviceCleanerState.autoCleanInterval); 
+                deviceCleanerState.autoCleanInterval = null 
+            } 
+            if (minutes > 0) { 
+                deviceCleanerState.autoCleanInterval = setInterval(() => { 
+                    cleanInactiveDevices() 
+                }, minutes * 60 * 1000); 
+                showCleanerStatus(`Auto-limpieza configurada cada ${minutes} minutos`, 'info') 
+            } else { 
+                showCleanerStatus('Auto-limpieza desactivada', 'info') 
+            } 
+        }
+        
         function crearTarjetaUsuarioJellyfin(usuario) { 
             const { diasRestantes, estado, estadoClass, diasClass } = calcularEstado(usuario.endDate); 
             const estadoHTML = `<span class="user-status ${estadoClass}">${estado === 'active' ? 'Activo' : estado === 'warning' ? (diasRestantes === 'No definido' ? 'Sin configurar' : 'Por expirar') : 'Expirado'}</span>`; 
@@ -2195,27 +2399,18 @@
                     <div>
                         <div class="user-name" contenteditable="true" onblur="actualizarNombreUsuario('${usuario.id}',this.textContent,'jellyfin')">${usuario.name || 'Sin nombre'}</div>
                         <div class="user-email">${usuario.email}</div>
-                        ${usuario.phone ? 
-                            `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'jellyfin')"><i class="fas fa-phone"></i> ${usuario.phone}</div>` : 
-                            `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'jellyfin')" style="color:var(--text-light)"><i class="fas fa-phone"></i> Agregar teléfono</div>`
-                        }
+                        ${usuario.phone ? `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'jellyfin')"><i class="fas fa-phone"></i> ${usuario.phone}</div>` : `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'jellyfin')" style="color:var(--text-light)"><i class="fas fa-phone"></i> Agregar teléfono</div>`}
                     </div>
                     ${estadoHTML}
                 </div>
                 <div class="user-dates">
                     <div class="date-item">
                         <span class="date-label">Inicio:</span>
-                        ${esNoDefinido ? 
-                            `<input type="date" class="date-input" value="${startDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','startDate',this.value,'jellyfin')">` : 
-                            `<span class="date-value">${formatearFecha(usuario.startDate)}</span>`
-                        }
+                        ${esNoDefinido ? `<input type="date" class="date-input" value="${startDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','startDate',this.value,'jellyfin')">` : `<span class="date-value">${formatearFecha(usuario.startDate)}</span>`}
                     </div>
                     <div class="date-item">
                         <span class="date-label">Fin:</span>
-                        ${esNoDefinido ? 
-                            `<input type="date" class="date-input" value="${endDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','endDate',this.value,'jellyfin')">` : 
-                            `<span class="date-value">${formatearFecha(usuario.endDate)}</span>`
-                        }
+                        ${esNoDefinido ? `<input type="date" class="date-input" value="${endDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','endDate',this.value,'jellyfin')">` : `<span class="date-value">${formatearFecha(usuario.endDate)}</span>`}
                     </div>
                 </div>
                 <div class="user-footer">
@@ -2292,9 +2487,10 @@
         async function eliminarUsuarioJellyfin(userId) { 
             if (confirm('¿Estás seguro de eliminar este usuario de Jellyfin? Esta acción no se puede deshacer.')) { 
                 try { 
-                    const response = await fetch(`${jellyfinConfig.serverUrl}/Users/${userId}?api_key=${jellyfinConfig.apiKey}`, { 
-                        method: 'DELETE' 
-                    }); 
+                    const urlServidor = await obtenerUrlServidor(jellyfinConfig), 
+                          response = await fetchWithCORS(`${urlServidor}/Users/${userId}?api_key=${jellyfinConfig.apiKey}`, { 
+                              method: 'DELETE' 
+                          }); 
                     if (response.ok) { 
                         jellyfinUsers = jellyfinUsers.filter(u => u.id !== userId); 
                         guardarUsuarios(jellyfinUsers, 'jellyfin'); 
@@ -2312,7 +2508,8 @@
         
         async function obtenerUsuariosActivosJellyfin() { 
             try { 
-                const response = await fetch(`${jellyfinConfig.serverUrl}/Sessions?api_key=${jellyfinConfig.apiKey}`); 
+                const urlServidor = await obtenerUrlServidor(jellyfinConfig), 
+                      response = await fetchWithCORS(`${urlServidor}/Sessions?api_key=${jellyfinConfig.apiKey}`); 
                 if (!response.ok) throw new Error('Error al obtener sesiones activas de Jellyfin'); 
                 const sessions = await response.json(); 
                 return sessions.filter(session => session.NowPlayingItem) 
@@ -2323,22 +2520,19 @@
         }
         
         function crearTarjetaUsuarioActivoJellyfin(session) { 
-            const usuario = jellyfinUsers.find(u => u.id === session.UserId) || { 
-                    name: session.UserName || 'Usuario desconocido', 
-                    email: session.UserName || 'sin-email' 
-                }, 
-                nowPlaying = session.NowPlayingItem, 
-                positionTicks = session.PlayState ? session.PlayState.PositionTicks || 0 : 0, 
-                runtimeTicks = nowPlaying.RunTimeTicks || 1, 
-                progress = Math.min(100, Math.round((positionTicks / runtimeTicks) * 100)), 
-                runtime = Math.floor(runtimeTicks / 10000000 / 60), 
-                currentPosition = Math.floor(positionTicks / 10000000), 
-                formatTime = seconds => { 
-                    const hrs = Math.floor(seconds / 3600), 
-                          mins = Math.floor((seconds % 3600) / 60), 
-                          secs = Math.floor(seconds % 60); 
-                    return `${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s` 
-                }; 
+            const usuario = jellyfinUsers.find(u => u.id === session.UserId) || { name: session.UserName || 'Usuario desconocido', email: session.UserName || 'sin-email' }, 
+                  nowPlaying = session.NowPlayingItem, 
+                  positionTicks = session.PlayState ? session.PlayState.PositionTicks || 0 : 0, 
+                  runtimeTicks = nowPlaying.RunTimeTicks || 1, 
+                  progress = Math.min(100, Math.round((positionTicks / runtimeTicks) * 100)), 
+                  runtime = Math.floor(runtimeTicks / 10000000 / 60), 
+                  currentPosition = Math.floor(positionTicks / 10000000), 
+                  formatTime = seconds => { 
+                      const hrs = Math.floor(seconds / 3600), 
+                            mins = Math.floor((seconds % 3600) / 60), 
+                            secs = Math.floor(seconds % 60); 
+                      return `${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s` 
+                  }; 
             
             let itemType = '', 
                 icon = '', 
@@ -2352,7 +2546,7 @@
                 mainTitle = nowPlaying.Name || 'Película sin título'; 
                 subtitle = itemType; 
                 if (nowPlaying.ImageTags && nowPlaying.ImageTags.Primary) { 
-                    coverUrl = `${jellyfinConfig.serverUrl}/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` 
+                    coverUrl = `${jellyfinConfig.currentUrl}/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` 
                 } 
             } else if (nowPlaying.Type === 'Episode') { 
                 itemType = 'Serie'; 
@@ -2367,7 +2561,7 @@
                 } 
                 const seriesId = nowPlaying.SeriesId || nowPlaying.ParentBackdropItemId; 
                 if (seriesId) { 
-                    coverUrl = `${jellyfinConfig.serverUrl}/Items/${seriesId}/Images/Primary?maxHeight=200&quality=90` 
+                    coverUrl = `${jellyfinConfig.currentUrl}/Items/${seriesId}/Images/Primary?maxHeight=200&quality=90` 
                 } 
             } else { 
                 itemType = 'Contenido'; 
@@ -2375,7 +2569,7 @@
                 mainTitle = nowPlaying.Name || 'Contenido sin título'; 
                 subtitle = itemType; 
                 if (nowPlaying.ImageTags && nowPlaying.ImageTags.Primary) { 
-                    coverUrl = `${jellyfinConfig.serverUrl}/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` 
+                    coverUrl = `${jellyfinConfig.currentUrl}/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` 
                 } 
             } 
             
@@ -2390,10 +2584,7 @@
                 </div>
                 <div class="now-playing-content">
                     <div class="media-cover">
-                        ${coverUrl ? 
-                            `<img src="${coverUrl}" alt="${mainTitle}">` : 
-                            `<div class="media-cover-placeholder"><i class="fas fa-image"></i></div>`
-                        }
+                        ${coverUrl ? `<img src="${coverUrl}" alt="${mainTitle}">` : `<div class="media-cover-placeholder"><i class="fas fa-image"></i></div>`}
                     </div>
                     <div class="media-info">
                         <div class="media-title">${mainTitle}</div>
@@ -2417,16 +2608,14 @@
                                 <div style="color:var(--text-light)">Dispositivo</div>
                                 <div>${session.DeviceName || 'Desconocido'}</div>
                             </div>
-                            ${session.Client ? `
-                                <div>
-                                    <div style="color:var(--text-light)">Cliente</div>
-                                    <div>${session.Client}</div>
-                                </div>` : ''}
-                            ${session.PlayState && session.PlayState.PlayMethod ? `
-                                <div>
-                                    <div style="color:var(--text-light)">Método</div>
-                                    <div>${session.PlayState.PlayMethod === 'Transcode' ? 'Transcodificado' : 'Directo'}</div>
-                                </div>` : ''}
+                            ${session.Client ? `<div>
+                                <div style="color:var(--text-light)">Cliente</div>
+                                <div>${session.Client}</div>
+                            </div>` : ''}
+                            ${session.PlayState && session.PlayState.PlayMethod ? `<div>
+                                <div style="color:var(--text-light)">Método</div>
+                                <div>${session.PlayState.PlayMethod === 'Transcode' ? 'Transcodificado' : 'Directo'}</div>
+                            </div>` : ''}
                         </div>
                     </div>
                 </div>
@@ -2435,7 +2624,8 @@
         
         async function actualizarProgresoEnTiempoRealJellyfin() { 
             try { 
-                const response = await fetch(`${jellyfinConfig.serverUrl}/Sessions?api_key=${jellyfinConfig.apiKey}`); 
+                const urlServidor = await obtenerUrlServidor(jellyfinConfig), 
+                      response = await fetchWithCORS(`${urlServidor}/Sessions?api_key=${jellyfinConfig.apiKey}`); 
                 if (!response.ok) return; 
                 const sessions = await response.json(), 
                       activeSessions = sessions.filter(session => session.NowPlayingItem); 
@@ -2443,7 +2633,6 @@
                 activeSessions.forEach(session => { 
                     const card = document.querySelector(`.user-card[data-session-id="${session.Id}"]`); 
                     if (!card) return; 
-                    
                     const nowPlaying = session.NowPlayingItem, 
                           positionTicks = session.PlayState ? session.PlayState.PositionTicks || 0 : 0, 
                           runtimeTicks = nowPlaying.RunTimeTicks || 1, 
@@ -2455,7 +2644,6 @@
                         if (Math.abs(currentProgress - progress) >= 1) { 
                             progressBar.style.width = `${progress}%`; 
                             progressBar.dataset.progress = progress; 
-                            
                             const currentPosition = Math.floor(positionTicks / 10000000), 
                                   runtime = Math.floor(runtimeTicks / 10000000), 
                                   formatTime = seconds => { 
@@ -2487,7 +2675,6 @@
             const activeSessions = await obtenerUsuariosActivosJellyfin(), 
                   container = document.getElementById('jellyfinActiveUsersContainer'), 
                   emptyState = document.getElementById('jellyfinNoActiveUsers'); 
-            
             container.innerHTML = ''; 
             document.getElementById('jellyfinActiveUsersCount').textContent = activeSessions.length; 
             document.getElementById('jellyfinModalActiveCount').textContent = activeSessions.length; 
@@ -2505,13 +2692,12 @@
         
         async function cargarUsuariosJellyfin() { 
             try { 
-                console.log('Usando URL del servidor de Jellyfin:', jellyfinConfig.serverUrl); 
-                const response = await fetch(`${jellyfinConfig.serverUrl}/Users?api_key=${jellyfinConfig.apiKey}`); 
+                const urlServidor = await obtenerUrlServidor(jellyfinConfig); 
+                console.log('Usando URL del servidor de Jellyfin:', urlServidor); 
+                const response = await fetchWithCORS(`${urlServidor}/Users?api_key=${jellyfinConfig.apiKey}`); 
                 if (!response.ok) throw new Error('Error al obtener usuarios de Jellyfin'); 
-                
                 const data = await response.json(), 
                       container = document.getElementById('jellyfinUsersContainer'); 
-                
                 container.innerHTML = ''; 
                 const emptyState = document.getElementById('jellyfinEmptyState'); 
                 
@@ -2554,7 +2740,6 @@
         function filtrarUsuariosJellyfin(searchTerm) { 
             const cards = document.querySelectorAll('#jellyfinUsersContainer .user-card'); 
             let visibleCount = 0; 
-            
             cards.forEach(card => { 
                 const name = card.querySelector('.user-name').textContent.toLowerCase(), 
                       email = card.querySelector('.user-email').textContent.toLowerCase(), 
@@ -2584,235 +2769,6 @@
             } 
         }
         
-        // Funciones para el limpiador de dispositivos
-        function showCleanerStatus(message, type) { 
-            const statusElement = document.getElementById('statusEmbyDevices'); 
-            statusElement.textContent = message; 
-            statusElement.className = `status-message status-${type}`; 
-            statusElement.style.display = 'block'; 
-            if (type !== 'error') { 
-                setTimeout(() => { 
-                    statusElement.style.display = 'none' 
-                }, 5000) 
-            } 
-        }
-        
-        async function loadDevices() { 
-            try { 
-                showCleanerStatus('Cargando dispositivos...', 'info'); 
-                const response = await fetch(`${embyConfig.serverUrl}/Devices`, { 
-                    headers: { 'X-Emby-Token': embyConfig.apiKey } 
-                }); 
-                if (!response.ok) { 
-                    throw new Error(`Error ${response.status}: ${response.statusText}`) 
-                } 
-                const devices = await response.json(); 
-                displayDevices(devices.Items); 
-                showCleanerStatus(`${devices.Items.length} dispositivos cargados`, 'success') 
-            } catch (error) { 
-                console.error('Error al cargar dispositivos:', error); 
-                showCleanerStatus(`Error: ${error.message}`, 'error'); 
-                document.getElementById('devicesEmby').innerHTML = `Error al cargar dispositivos: ${error.message}` 
-            } 
-        }
-        
-        function displayDevices(devices) { 
-            const now = new Date(), 
-                  container = document.getElementById('devicesEmby'); 
-            container.innerHTML = ''; 
-            
-            if (devices.length === 0) { 
-                container.innerHTML = '<div class="device-item">No hay dispositivos</div>'; 
-                return 
-            } 
-            
-            devices.sort((a, b) => new Date(a.DateLastActivity || 0) - new Date(b.DateLastActivity || 0)); 
-            
-            devices.forEach(device => { 
-                const lastActive = device.DateLastActivity ? new Date(device.DateLastActivity) : null, 
-                      minutesInactive = lastActive ? Math.floor((now - lastActive) / (1000 * 60)) : null, 
-                      isInactive = minutesInactive !== null && minutesInactive > 10, 
-                      deviceElement = document.createElement('div'); 
-                
-                deviceElement.className = `device-item ${isInactive ? 'to-delete' : ''}`; 
-                deviceElement.innerHTML = `
-                    <div class="device-info">
-                        <div class="device-name">${device.Name || 'Desconocido'}</div>
-                        <div class="device-details">
-                            <span>ID: ${device.Id}</span>
-                            ${lastActive ? 
-                                `<span>Última actividad: ${lastActive.toLocaleString()}</span>
-                                 <span>Inactivo: ${minutesInactive} minutos</span>` : 
-                                '<span>Nunca activo</span>'
-                            }
-                        </div>
-                    </div>
-                `; 
-                container.appendChild(deviceElement) 
-            }) 
-        }
-        
-        async function cleanInactiveDevices() { 
-            try { 
-                showCleanerStatus('Buscando dispositivos inactivos...', 'info'); 
-                const response = await fetch(`${embyConfig.serverUrl}/Devices`, { 
-                    headers: { 'X-Emby-Token': embyConfig.apiKey } 
-                }); 
-                if (!response.ok) { 
-                    throw new Error(`Error ${response.status}: ${response.statusText}`) 
-                } 
-                const devices = await response.json(), 
-                      now = new Date(), 
-                      inactiveDevices = devices.Items.filter(device => { 
-                          if (!device.DateLastActivity) return true; 
-                          const lastActive = new Date(device.DateLastActivity), 
-                                minutesInactive = Math.floor((now - lastActive) / (1000 * 60)); 
-                          return minutesInactive > 10 
-                      }); 
-                
-                if (inactiveDevices.length === 0) { 
-                    showCleanerStatus('No hay dispositivos inactivos para eliminar', 'info'); 
-                    return 
-                } 
-                
-                showCleanerStatus(`Eliminando ${inactiveDevices.length} dispositivos inactivos...`, 'info'); 
-                let deletedCount = 0; 
-                
-                for (const device of inactiveDevices) { 
-                    try { 
-                        const deleteResponse = await fetch(`${embyConfig.serverUrl}/Devices`, { 
-                            method: 'DELETE', 
-                            headers: { 
-                                'X-Emby-Token': embyConfig.apiKey, 
-                                'Content-Type': 'application/json' 
-                            }, 
-                            body: JSON.stringify({ Id: device.Id }) 
-                        }); 
-                        if (deleteResponse.ok) { 
-                            deletedCount++ 
-                        } else { 
-                            console.error(`Error al eliminar dispositivo ${device.Id}:`, deleteResponse.statusText) 
-                        } 
-                    } catch (error) { 
-                        console.error(`Error al eliminar dispositivo ${device.Id}:`, error) 
-                    } 
-                } 
-                
-                showCleanerStatus(`Se eliminaron ${deletedCount} dispositivos inactivos`, 'success'); 
-                loadDevices() 
-            } catch (error) { 
-                console.error('Error al limpiar dispositivos:', error); 
-                showCleanerStatus(`Error: ${error.message}`, 'error') 
-            } 
-        }
-        
-        function setupAutoClean(minutes) { 
-            if (deviceCleanerState.autoCleanInterval) { 
-                clearInterval(deviceCleanerState.autoCleanInterval); 
-                deviceCleanerState.autoCleanInterval = null 
-            } 
-            if (minutes > 0) { 
-                deviceCleanerState.autoCleanInterval = setInterval(() => { 
-                    cleanInactiveDevices() 
-                }, minutes * 60 * 1000); 
-                showCleanerStatus(`Auto-limpieza configurada cada ${minutes} minutos`, 'info') 
-            } else { 
-                showCleanerStatus('Auto-limpieza desactivada', 'info') 
-            } 
-        }
-        
-        // Funciones para estrenos
-        async function getEstrenos() { 
-            const apiKey = 'e22418df765186e2208cf44bef9e3bd2', 
-                  hoy = new Date(), 
-                  hace7Dias = new Date(hoy); 
-            
-            hace7Dias.setDate(hoy.getDate() - 7); 
-            const fechaInicio = formatDate(hace7Dias), 
-                  fechaFin = formatDate(hoy), 
-                  hoyStr = formatDate(hoy); 
-            
-            try { 
-                const responseMovies = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&language=es-MX®ion=MX&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&primary_release_date.gte=${fechaInicio}&primary_release_date.lte=${fechaFin}`), 
-                      dataMovies = await responseMovies.json(), 
-                      responseTV = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${apiKey}&language=es-MX®ion=MX&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&first_air_date.gte=${fechaInicio}&first_air_date.lte=${fechaFin}`), 
-                      dataTV = await responseTV.json(), 
-                      proximosMovies = dataMovies.results.filter(movie => movie.release_date >= hoyStr).sort((a, b) => new Date(a.release_date) - new Date(b.release_date)), 
-                      recientesMovies = dataMovies.results.filter(movie => movie.release_date < hoyStr).sort((a, b) => new Date(b.release_date) - new Date(a.release_date)), 
-                      proximosTV = dataTV.results.filter(serie => serie.first_air_date >= hoyStr).sort((a, b) => new Date(a.first_air_date) - new Date(b.first_air_date)), 
-                      recientesTV = dataTV.results.filter(serie => serie.first_air_date < hoyStr).sort((a, b) => new Date(b.first_air_date) - new Date(a.first_air_date)), 
-                      todosProximos = [...proximosMovies, ...proximosTV], 
-                      todosRecientes = [...recientesMovies, ...recientesTV]; 
-                
-                return { 
-                    proximos: todosProximos.sort((a, b) => { 
-                        const fechaA = a.release_date || a.first_air_date, 
-                              fechaB = b.release_date || b.first_air_date; 
-                        return new Date(fechaA) - new Date(fechaB) 
-                    }), 
-                    recientes: todosRecientes.sort((a, b) => { 
-                        const fechaA = a.release_date || a.first_air_date, 
-                              fechaB = b.release_date || b.first_air_date; 
-                        return new Date(fechaB) - new Date(fechaA) 
-                    }) 
-                } 
-            } catch (error) { 
-                console.error('Error al obtener estrenos:', error); 
-                return { proximos: [], recientes: [] } 
-            } 
-        }
-        
-        function formatDate(date) { 
-            return date.toISOString().split('T')[0]; 
-        }
-        
-        function crearCardEstreno(estreno, esProximo) { 
-            if (!estreno.poster_path) return null; 
-            
-            const card = document.createElement('div'); 
-            card.className = 'estreno-card'; 
-            const esSerie = estreno.first_air_date !== undefined, 
-                  titulo = estreno.title || estreno.name, 
-                  fechaEstreno = esSerie ? 
-                      (estreno.first_air_date ? new Date(estreno.first_air_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : 'Próximamente') : 
-                      (estreno.release_date ? new Date(estreno.release_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : 'Próximamente'), 
-                  badgeClass = esProximo ? 'badge-proximo' : 'badge-reciente', 
-                  badgeText = esProximo ? 'PRÓXIMO' : 'ESTRENADA'; 
-            
-            card.innerHTML = `
-                <img src="https://image.tmdb.org/t/p/w500${estreno.poster_path}" alt="${titulo}" class="estreno-poster" onerror="this.src='https://via.placeholder.com/500x750/181818/ffffff?text=Poster+no+disponible'">
-                <div class="estreno-badge ${badgeClass}">${badgeText}</div>
-                ${esSerie ? '<div class="estreno-badge badge-serie">SERIE</div>' : ''}
-                <div class="estreno-info">
-                    <div class="estreno-titulo">${titulo}</div>
-                    <div class="estreno-fecha">${esSerie ? 'Estreno:' : 'Estreno:'} ${fechaEstreno}</div>
-                </div>
-            `; 
-            return card; 
-        }
-        
-        async function mostrarEstrenos() { 
-            const { proximos, recientes } = await getEstrenos(), 
-                  estrenosList = document.getElementById('estrenos-list'); 
-            
-            estrenosList.innerHTML = ''; 
-            
-            if (proximos.length === 0 && recientes.length === 0) { 
-                estrenosList.innerHTML = '<p class="no-estrenos">No hay estrenos esta semana</p>'; 
-                return 
-            } 
-            
-            [...proximos, ...recientes].forEach(estreno => { 
-                const esProximo = estreno.release_date ? 
-                    (estreno.release_date >= new Date().toISOString().split('T')[0]) : 
-                    (estreno.first_air_date >= new Date().toISOString().split('T')[0]), 
-                    card = crearCardEstreno(estreno, esProximo); 
-                
-                if (card) estrenosList.appendChild(card) 
-            }) 
-        }
-        
-        // Funciones generales
         function editarTelefono(userId, element, service) { 
             if (service === 'emby') { 
                 editarTelefonoEmby(userId, element) 
@@ -2852,17 +2808,131 @@
                 eliminarUsuarioJellyfin(userId) 
             } 
         }
-        
-        // Inicialización
+
         document.addEventListener('DOMContentLoaded', function() {
-            // Configurar fechas mínimas en los formularios
+            const apiKey = 'e22418df765186e2208cf44bef9e3bd2', 
+                  estrenosList = document.getElementById('estrenos-list'), 
+                  semanaTexto = document.getElementById('semana-actual-texto');
+            
+            function getFechasSemana() { 
+                const hoy = new Date(), 
+                      diaSemana = hoy.getDay(), 
+                      diff = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1), 
+                      inicioSemana = new Date(hoy.setDate(diff)), 
+                      finSemana = new Date(inicioSemana); 
+                finSemana.setDate(finSemana.getDate() + 6); 
+                return { inicioSemana, finSemana } 
+            }
+            
+            function formatearFecha(fecha) { 
+                const options = { day: 'numeric', month: 'long' }; 
+                return fecha.toLocaleDateString('es-MX', options) 
+            }
+            
+            function actualizarTextoSemana(inicio, fin) { 
+                semanaTexto.textContent = `del ${formatearFecha(inicio)} al ${formatearFecha(fin)}` 
+            }
+            
+            async function getEstrenos() { 
+                const { inicioSemana, finSemana } = getFechasSemana(); 
+                actualizarTextoSemana(inicioSemana, finSemana); 
+                const formatDate = date => date.toISOString().split('T')[0], 
+                      hoy = new Date(), 
+                      hace7Dias = new Date(hoy); 
+                hace7Dias.setDate(hoy.getDate() - 7); 
+                const fechaInicio = formatDate(hace7Dias), 
+                      fechaFin = formatDate(finSemana), 
+                      hoyStr = formatDate(hoy); 
+                
+                try { 
+                    const responseMovies = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&language=es-MX®ion=MX&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&primary_release_date.gte=${fechaInicio}&primary_release_date.lte=${fechaFin}`), 
+                          dataMovies = await responseMovies.json(), 
+                          responseTV = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${apiKey}&language=es-MX®ion=MX&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&first_air_date.gte=${fechaInicio}&first_air_date.lte=${fechaFin}`), 
+                          dataTV = await responseTV.json(), 
+                          proximosMovies = dataMovies.results.filter(movie => movie.release_date >= hoyStr).sort((a, b) => new Date(a.release_date) - new Date(b.release_date)), 
+                          recientesMovies = dataMovies.results.filter(movie => movie.release_date < hoyStr).sort((a, b) => new Date(b.release_date) - new Date(a.release_date)), 
+                          proximosTV = dataTV.results.filter(serie => serie.first_air_date >= hoyStr).sort((a, b) => new Date(a.first_air_date) - new Date(b.first_air_date)), 
+                          recientesTV = dataTV.results.filter(serie => serie.first_air_date < hoyStr).sort((a, b) => new Date(b.first_air_date) - new Date(a.first_air_date)), 
+                          todosProximos = [...proximosMovies, ...proximosTV], 
+                          todosRecientes = [...recientesMovies, ...recientesTV]; 
+                    
+                    return { 
+                        proximos: todosProximos.sort((a, b) => { 
+                            const fechaA = a.release_date || a.first_air_date, 
+                                  fechaB = b.release_date || b.first_air_date; 
+                            return new Date(fechaA) - new Date(fechaB) 
+                        }), 
+                        recientes: todosRecientes.sort((a, b) => { 
+                            const fechaA = a.release_date || a.first_air_date, 
+                                  fechaB = b.release_date || b.first_air_date; 
+                            return new Date(fechaB) - new Date(fechaA) 
+                        }) 
+                    } 
+                } catch (error) { 
+                    console.error('Error al obtener estrenos:', error); 
+                    return { proximos: [], recientes: [] } 
+                } 
+            }
+            
+            function crearCardEstreno(estreno, esProximo) { 
+                if (!estreno.poster_path) return null; 
+                const card = document.createElement('div'); 
+                card.className = 'estreno-card'; 
+                const esSerie = estreno.first_air_date !== undefined, 
+                      titulo = estreno.title || estreno.name, 
+                      fechaEstreno = esSerie ? (estreno.first_air_date ? new Date(estreno.first_air_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : 'Próximamente') : (estreno.release_date ? new Date(estreno.release_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : 'Próximamente'), 
+                      badgeClass = esProximo ? 'badge-proximo' : 'badge-reciente', 
+                      badgeText = esProximo ? 'PRÓXIMO' : 'ESTRENADA'; 
+                
+                card.innerHTML = `
+                    <img src="https://image.tmdb.org/t/p/w500${estreno.poster_path}" alt="${titulo}" class="estreno-poster" onerror="this.src='https://via.placeholder.com/500x750/181818/ffffff?text=Poster+no+disponible'">
+                    <div class="estreno-badge ${badgeClass}">${badgeText}</div>
+                    ${esSerie ? '<div class="estreno-badge badge-serie">SERIE</div>' : ''}
+                    <div class="estreno-info">
+                        <div class="estreno-titulo">${titulo}</div>
+                        <div class="estreno-fecha">${esSerie ? 'Estreno:' : 'Estreno:'} ${fechaEstreno}</div>
+                    </div>
+                `; 
+                return card 
+            }
+            
+            async function mostrarEstrenos() { 
+                const { proximos, recientes } = await getEstrenos(); 
+                estrenosList.innerHTML = ''; 
+                
+                if (proximos.length === 0 && recientes.length === 0) { 
+                    estrenosList.innerHTML = '<p class="no-estrenos">No hay estrenos esta semana</p>'; 
+                    return 
+                } 
+                
+                [...proximos, ...recientes].forEach(estreno => { 
+                    const esProximo = estreno.release_date ? (estreno.release_date >= new Date().toISOString().split('T')[0]) : (estreno.first_air_date >= new Date().toISOString().split('T')[0]), 
+                          card = crearCardEstreno(estreno, esProximo); 
+                    if (card) estrenosList.appendChild(card) 
+                }) 
+            }
+            
+            function iniciar() { 
+                mostrarEstrenos(); 
+                setInterval(() => { 
+                    const ahora = new Date(); 
+                    if (ahora.getDay() === 1 && ahora.getHours() === 0) { 
+                        location.reload() 
+                    } 
+                }, 60 * 60 * 1000) 
+            }
+            
+            iniciar();
+            
+            cargarUsuariosEmby(); 
+            cargarUsuariosJellyfin();
+            
             const hoy = new Date().toISOString().split('T')[0];
             document.getElementById('embyStartDate').min = hoy; 
             document.getElementById('embyEndDate').min = hoy; 
             document.getElementById('jellyfinStartDate').min = hoy; 
             document.getElementById('jellyfinEndDate').min = hoy;
             
-            // Configurar validación de fechas
             document.getElementById('embyStartDate').addEventListener('change', function() { 
                 const startDate = this.value; 
                 document.getElementById('embyEndDate').min = startDate; 
@@ -2879,36 +2949,20 @@
                 } 
             });
             
-            // Cargar usuarios y estrenos
-            cargarUsuariosEmby(); 
-            cargarUsuariosJellyfin();
-            mostrarEstrenos();
-            
-            // Configurar intervalos para actualización en tiempo real
             setInterval(actualizarUsuariosActivosEmby, 30000); 
             setInterval(actualizarProgresoEnTiempoRealEmby, 5000); 
             setInterval(actualizarUsuariosActivosJellyfin, 30000); 
             setInterval(actualizarProgresoEnTiempoRealJellyfin, 5000);
             
-            // Actualizar datos iniciales
             actualizarUsuariosActivosEmby(); 
             actualizarProgresoEnTiempoRealEmby(); 
             actualizarUsuariosActivosJellyfin(); 
             actualizarProgresoEnTiempoRealJellyfin();
             
-            // Configurar limpiador de dispositivos
+            detectNetworkForCleaner(); 
             setupAutoClean(10);
-            
-            // Verificar actualización semanal de estrenos
-            setInterval(() => { 
-                const ahora = new Date(); 
-                if (ahora.getDay() === 1 && ahora.getHours() === 0) { 
-                    location.reload() 
-                } 
-            }, 60 * 60 * 1000);
         });
-        
-        // Event listeners para formularios
+
         document.getElementById('embyUserForm').addEventListener('submit', async function(e) { 
             e.preventDefault(); 
             const name = document.getElementById('embyName').value.trim(), 
@@ -2924,11 +2978,12 @@
             } 
             
             try { 
-                const response = await fetch(`${embyConfig.serverUrl}/emby/Users/New?api_key=${embyConfig.apiKey}`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ Name: email, Password: password }) 
-                }); 
+                const urlServidor = await obtenerUrlServidor(embyConfig), 
+                      response = await fetchWithCORS(`${urlServidor}/emby/Users/New?api_key=${embyConfig.apiKey}`, { 
+                          method: 'POST', 
+                          headers: { 'Content-Type': 'application/json' }, 
+                          body: JSON.stringify({ Name: email, Password: password }) 
+                      }); 
                 
                 if (response.ok) { 
                     const nuevoUsuario = await response.json(); 
@@ -2969,11 +3024,12 @@
             } 
             
             try { 
-                const response = await fetch(`${jellyfinConfig.serverUrl}/Users/New?api_key=${jellyfinConfig.apiKey}`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ Name: email, Password: password }) 
-                }); 
+                const urlServidor = await obtenerUrlServidor(jellyfinConfig), 
+                      response = await fetchWithCORS(`${urlServidor}/Users/New?api_key=${jellyfinConfig.apiKey}`, { 
+                          method: 'POST', 
+                          headers: { 'Content-Type': 'application/json' }, 
+                          body: JSON.stringify({ Name: email, Password: password }) 
+                      }); 
                 
                 if (response.ok) { 
                     const nuevoUsuario = await response.json(); 
@@ -2999,7 +3055,6 @@
             } 
         });
         
-        // Event listeners para exportar/importar datos
         document.getElementById('embyExportBtn').addEventListener('click', function() { 
             const usuarios = cargarUsuariosDesdeLocalStorage('emby'); 
             if (usuarios.length === 0) { 
@@ -3026,17 +3081,14 @@
         document.getElementById('embyFileInput').addEventListener('change', function(event) { 
             const file = event.target.files[0]; 
             if (!file) return; 
-            
             const reader = new FileReader(); 
             reader.onload = function(e) { 
                 try { 
                     const contenido = e.target.result, 
                           datosImportados = JSON.parse(contenido); 
-                    
                     if (!Array.isArray(datosImportados)) { 
                         throw new Error('Formato de archivo inválido') 
                     } 
-                    
                     if (confirm(`¿Importar ${datosImportados.length} usuarios a Emby? Esto sobrescribirá los datos actuales.`)) { 
                         localStorage.setItem(embyConfig.localStorageKey, JSON.stringify(datosImportados)); 
                         embyUsers = datosImportados; 
@@ -3078,17 +3130,14 @@
         document.getElementById('jellyfinFileInput').addEventListener('change', function(event) { 
             const file = event.target.files[0]; 
             if (!file) return; 
-            
             const reader = new FileReader(); 
             reader.onload = function(e) { 
                 try { 
                     const contenido = e.target.result, 
                           datosImportados = JSON.parse(contenido); 
-                    
                     if (!Array.isArray(datosImportados)) { 
                         throw new Error('Formato de archivo inválido') 
                     } 
-                    
                     if (confirm(`¿Importar ${datosImportados.length} usuarios a Jellyfin? Esto sobrescribirá los datos actuales.`)) { 
                         localStorage.setItem(jellyfinConfig.localStorageKey, JSON.stringify(datosImportados)); 
                         jellyfinUsers = datosImportados; 
@@ -3104,9 +3153,14 @@
             event.target.value = '' 
         });
         
-        // Event listeners para modales
-        closeModal.addEventListener('click', () => { extendModal.style.display = 'none' });
-        cancelExtend.addEventListener('click', () => { extendModal.style.display = 'none' });
+        closeModal.addEventListener('click', () => { 
+            extendModal.style.display = 'none' 
+        });
+        
+        cancelExtend.addEventListener('click', () => { 
+            extendModal.style.display = 'none' 
+        });
+        
         confirmExtend.addEventListener('click', () => { 
             const dias = parseInt(extendDaysInput.value); 
             if (dias > 0 && currentExtendUserId && currentExtendService) { 
@@ -3133,7 +3187,6 @@
             document.getElementById('modalNewEnd').textContent = formatearFecha(nuevaFecha.toISOString().split('T')[0]) 
         });
         
-        // Event listeners para botones flotantes
         document.getElementById('embyActiveUsersBtn').addEventListener('click', function() { 
             document.getElementById('embyActiveUsersModal').style.display = 'block'; 
             actualizarUsuariosActivosEmby() 
@@ -3160,7 +3213,6 @@
             document.getElementById('devicesModal').style.display = 'none' 
         });
         
-        // Event listeners para el limpiador de dispositivos
         document.getElementById('refreshEmbyDevices').addEventListener('click', function() { 
             loadDevices() 
         });
@@ -3173,29 +3225,6 @@
             setupAutoClean(parseInt(e.target.value)) 
         });
         
-        // Event listeners para búsqueda
-        document.getElementById('embySearchInput').addEventListener('input', function(e) { 
-            filtrarUsuariosEmby(e.target.value) 
-        });
-        
-        document.getElementById('jellyfinSearchInput').addEventListener('input', function(e) { 
-            filtrarUsuariosJellyfin(e.target.value) 
-        });
-        
-        // Event listeners para pestañas
-        document.querySelectorAll('.tab').forEach(tab => { 
-            tab.addEventListener('click', function() { 
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); 
-                this.classList.add('active'); 
-                document.querySelectorAll('.tab-content').forEach(content => { 
-                    content.classList.remove('active') 
-                }); 
-                const tabId = this.getAttribute('data-tab'); 
-                document.getElementById(`${tabId}-tab`).classList.add('active') 
-            }) 
-        });
-        
-        // Cerrar modales al hacer clic fuera
         window.addEventListener('click', (event) => { 
             if (event.target === extendModal) { 
                 extendModal.style.display = 'none' 
@@ -3209,6 +3238,26 @@
             if (event.target === document.getElementById('devicesModal')) { 
                 document.getElementById('devicesModal').style.display = 'none' 
             } 
+        });
+        
+        document.getElementById('embySearchInput').addEventListener('input', function(e) { 
+            filtrarUsuariosEmby(e.target.value) 
+        });
+        
+        document.getElementById('jellyfinSearchInput').addEventListener('input', function(e) { 
+            filtrarUsuariosJellyfin(e.target.value) 
+        });
+        
+        document.querySelectorAll('.tab').forEach(tab => { 
+            tab.addEventListener('click', function() { 
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); 
+                this.classList.add('active'); 
+                document.querySelectorAll('.tab-content').forEach(content => { 
+                    content.classList.remove('active') 
+                }); 
+                const tabId = this.getAttribute('data-tab'); 
+                document.getElementById(`${tabId}-tab`).classList.add('active') 
+            }) 
         });
     </script>
 </body>
