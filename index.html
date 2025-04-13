@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control Dual: Emby y Jellyfin</title>
+    <style>
+        :root {
+            --emby-primary: #00a4ff;
+            --emby-primary-hover: #0087d4;
+            --emby-secondary: #6a00ff;
+            --emby-secondary-hover: #5a00e0;
+            --jellyfin-primary: #ff6b6b;
+            --jellyfin-primary-hover: #ff5252;
+            --jellyfin-secondary: #ffd166;
+            --jellyfin-secondary-hover: #ffc233;
+            --danger-color: #ff4d4d;
+            --danger-hover: #ff3333;
+            --warning-color: #ffaa33;
+            --warning-hover: #ff9900;
+            --success-color: #33cc33;
+            --success-hover: #29a329;
+            --info-color: #33b5ff;
+            --info-hover: #00a0ff;
+            --text-color: #f0f0f0;
+            --text-light: #c0c0c0;
+            --bg-color: #0a0a1a;
+            --card-bg: #1a1a2e;
+            --card-bg-hover: #252545;
+            --border-color: #3a3a5a;
+            --shadow: 0 4px 20px rgba(0,0,0,0.4);
+            --radius: 12px;
+            
+            /* Nuevos colores para gradientes animados */
+            --gradient-color-1: #6a00ff;
+            --gradient-color-2: #00a4ff;
+            --gradient-color-3: #00ffaa;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            color: var(--text-color);
+            font-size: 16px;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(106, 0, 255, 0.05) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(0, 164, 255, 0.05) 0%, transparent 20%);
+            background-size: 200% 200%;
+            animation: gradientBackground 30s ease infinite;
+        }
+        
+        @keyframes gradientBackground {
+            0% { background-position: 0% 0%; }
+            50% { background-position: 100% 100%; }
+            100% { background-position: 0% 0%; }
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+            overflow: hidden;
+            padding: 20px;
+            border-radius: var(--radius);
+            background: rgba(26, 26, 46, 0.7);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                var(--gradient-color-1),
+                var(--gradient-color-2),
+                var(--gradient-color-3),
+                var(--gradient-color-1)
+            );
+            background-size: 400% 400%;
+            animation: gradientFlow 15s ease infinite;
+            opacity: 0.2;
+            z-index: -1;
+        }
+        
+        @keyframes gradientFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .header h1 {
+            color: var(--text-color);
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: linear-gradient(90deg, var(--emby-primary), var(--emby-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            position: relative;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            justify-content: center;
+            background: rgba(26, 26, 46, 0.7);
+            backdrop-filter: blur(5px);
+            border-radius: var(--radius);
+            padding: 10px;
+            box-shadow: var(--shadow);
+        }
+        
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            margin: 0 10px;
+            border-radius: 6px 6px 0 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .tab::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--emby-primary), var(--emby-secondary));
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.3s ease;
+        }
+        
+        .tab:hover::after {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+        
+        .tab:hover {
+            background-color: rgba(255,255,255,0.05);
+        }
+        
+        .tab.active {
+            color: var(--emby-primary);
+        }
+        
+        .tab.active::after {
+            transform: scaleX(1);
+        }
+        
+        .tab.jellyfin.active {
+            color: var(--jellyfin-primary);
+        }
+        
+        .tab.jellyfin.active::after {
+            background: linear-gradient(90deg, var(--jellyfin-primary), var(--jellyfin-secondary));
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                135deg,
+                rgba(106, 0, 255, 0.1),
+                rgba(0, 164, 255, 0.1),
+                rgba(0, 255, 170, 0.1)
+            );
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        
+        .card:hover::before {
+            opacity: 1;
+        }
+        
+        .card-title {
+            font-size: 24px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-color);
+            position: relative;
+        }
+        
+        .card-title::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 50px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--emby-primary), var(--emby-secondary));
+            border-radius: 3px;
+        }
+        
+        .jellyfin .card-title::after {
+            background: linear-gradient(90deg, var(--jellyfin-primary), var(--jellyfin-secondary));
+        }
+        
+        .form-group {
+            margin-bottom: 18px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: var(--text-color);
+            font-size: 16px;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 14px;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 16px;
+            transition: all 0.3s;
+            background-color: rgba(42, 42, 74, 0.7);
+            color: var(--text-color);
+        }
+        
+        .form-control:focus {
+            border-color: var(--emby-primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 164, 255, 0.2);
+            background-color: rgba(51, 51, 85, 0.7);
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 17px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(255,255,255,0.1), rgba(255,255,255,0));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .btn:hover::after {
+            opacity: 1;
+        }
+        
+        .btn-primary {
+            background-color: var(--emby-primary);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--emby-primary-hover);
+        }
+        
+        .btn-secondary {
+            background-color: var(--emby-secondary);
+        }
+        
+        .btn-secondary:hover {
+            background-color: var(--emby-secondary-hover);
+        }
+        
+        .btn-jellyfin {
+            background-color: var(--jellyfin-primary);
+        }
+        
+        .btn-jellyfin:hover {
+            background-color: var(--jellyfin-primary-hover);
+        }
+        
+        .btn-jellyfin-secondary {
+            background-color: var(--jellyfin-secondary);
+            color: #333;
+        }
+        
+        .btn-jellyfin-secondary:hover {
+            background-color: var(--jellyfin-secondary-hover);
+            color: #333;
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+        }
+        
+        .btn-danger:hover {
+            background-color: var(--danger-hover);
+        }
+        
+        .btn-warning {
+            background-color: var(--warning-color);
+        }
+        
+        .btn-warning:hover {
+            background-color: var(--warning-hover);
+        }
+        
+        .btn-info {
+            background-color: var(--info-color);
+        }
+        
+        .btn-info:hover {
+            background-color: var(--info-hover);
+        }
+        
+        .btn-success {
+            background-color: var(--success-color);
+        }
+        
+        .btn-success:hover {
+            background-color: var(--success-hover);
+        }
+        
+        .btn-whatsapp {
+            background-color: #25D366;
+            color: white;
+        }
+        
+        .btn-whatsapp:hover {
+            background-color: #128C7E;
+        }
+        
+        .users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 25px;
+        }
+        
+        .user-card {
+            background-color: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            transition: all 0.3s;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .user-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            border-radius: var(--radius) 0 0 var(--radius);
+        }
+        
+        .user-card[data-service="emby"]::before {
+            background-color: var(--emby-primary);
+        }
+        
+        .user-card[data-service="jellyfin"]::before {
+            background-color: var(--jellyfin-primary);
+        }
+        
+        .user-card:hover {
+            transform: translateY(-5px);
+            background-color: var(--card-bg-hover);
+        }
+        
+        .user-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .user-name {
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 18px;
+            margin-bottom: 5px;
+            outline: none;
+        }
+        
+        .user-name[contenteditable="true"] {
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+        
+        .user-name[contenteditable="true"]:focus {
+            background-color: rgba(51, 51, 85, 0.7);
+            box-shadow: 0 0 0 2px rgba(0, 164, 255, 0.5);
+        }
+        
+        .user-email {
+            font-weight: 400;
+            color: var(--text-light);
+            word-break: break-all;
+            font-size: 15px;
+        }
+        
+        .user-phone {
+            font-size: 14px;
+            color: var(--text-color);
+            margin-top: 3px;
+            cursor: pointer;
+            padding: 2px 5px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        
+        .user-phone:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+        
+        .user-phone i {
+            margin-right: 5px;
+            color: var(--text-light);
+        }
+        
+        .user-status {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 90px;
+        }
+        
+        .status-active {
+            background-color: rgba(70, 180, 70, 0.2);
+            color: #81c784;
+            border: 1px solid #81c784;
+        }
+        
+        .status-warning {
+            background-color: rgba(237,108,2,0.2);
+            color: #ffb74d;
+            border: 1px solid #ffb74d;
+        }
+        
+        .status-expired {
+            background-color: rgba(255, 77, 77, 0.2);
+            color: #ff4d4d;
+            border: 1px solid #ff4d4d;
+        }
+        
+        .user-dates {
+            margin-bottom: 15px;
+        }
+        
+        .date-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .date-label {
+            font-size: 15px;
+            color: var(--text-light);
+        }
+        
+        .date-value {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+        
+        .date-input {
+            width: 120px;
+            padding: 5px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: rgba(42, 42, 74, 0.7);
+            color: var(--text-color);
+            font-size: 14px;
+        }
+        
+        .date-input:focus {
+            outline: none;
+            border-color: var(--emby-primary);
+            box-shadow: 0 0 0 2px rgba(0, 164, 255, 0.2);
+        }
+        
+        .user-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .days-remaining {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            text-align: center;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .days-positive {
+            background-color: rgba(70, 180, 70, 0.2);
+            color: #81c784;
+            border: 1px solid #81c784;
+        }
+        
+        .days-warning {
+            background-color: rgba(237,108,2,0.2);
+            color: #ffb74d;
+            border: 1px solid #ffb74d;
+        }
+        
+        .days-negative {
+            background-color: rgba(255, 77, 77, 0.2);
+            color: #ff4d4d;
+            border: 1px solid #ff4d4d;
+        }
+        
+        .user-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+            grid-column: 1 / -1;
+        }
+        
+        .empty-state i {
+            font-size: 50px;
+            margin-bottom: 15px;
+            color: #444;
+        }
+        
+        .empty-state h3 {
+            font-weight: 500;
+            margin-bottom: 10px;
+            color: var(--text-color);
+            font-size: 20px;
+        }
+        
+        .empty-state p {
+            font-size: 16px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+        
+        .modal-content {
+            background-color: var(--card-bg);
+            margin: 10% auto;
+            padding: 25px;
+            border-radius: var(--radius);
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            animation: modalFadeIn 0.3s;
+        }
+        
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        
+        .close-modal {
+            font-size: 28px;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: color 0.2s;
+        }
+        
+        .close-modal:hover {
+            color: var(--text-color);
+        }
+        
+        .modal-body {
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .extend-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 16px;
+        }
+        
+        .extend-input {
+            width: 80px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            text-align: center;
+            background-color: rgba(42, 42, 74, 0.7);
+            color: var(--text-color);
+            font-size: 16px;
+        }
+        
+        .data-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 25px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .data-actions .btn {
+            flex: 1;
+            min-width: 180px;
+        }
+        
+        .fileInput {
+            display: none;
+        }
+        
+        .searchInput {
+            background-color: rgba(42, 42, 74, 0.7);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 12px 14px;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: all 0.3s;
+            width: 100%;
+        }
+        
+        .searchInput:focus {
+            border-color: var(--emby-primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 164, 255, 0.2);
+            background-color: rgba(51, 51, 85, 0.7);
+        }
+        
+        .now-playing-content {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: nowrap;
+        }
+        
+        .media-cover {
+            flex: 0 0 100px;
+            height: 150px;
+            background-color: rgba(42, 42, 74, 0.7);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            min-width: 100px;
+        }
+        
+        .media-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .media-cover-placeholder {
+            font-size: 30px;
+            color: #444;
+        }
+        
+        .media-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        
+        .media-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 5px;
+        }
+        
+        .media-subtitle {
+            font-size: 13px;
+            color: var(--text-light);
+            margin-bottom: 10px;
+        }
+        
+        .active-user-card {
+            position: relative;
+        }
+        
+        .active-user-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background-color: var(--emby-primary);
+            border-radius: var(--radius) 0 0 var(--radius);
+        }
+        
+        .jellyfin-active-card::before {
+            background-color: var(--jellyfin-primary);
+        }
+        
+        .active-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 10px;
+            height: 10px;
+            background-color: #00e676;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(0.95); opacity: 1; }
+        }
+        
+        .floating-buttons-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 90;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        
+        .floating-btn {
+            padding: 12px 15px;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            min-width: auto;
+        }
+        
+        .floating-btn i {
+            font-size: 16px;
+        }
+        
+        .floating-btn .count-badge {
+            background-color: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+        
+        .activeUsersModal .modal-content {
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .activeUsersModal .users-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background-color: #333;
+            border-radius: 3px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: var(--emby-primary);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        
+        .jellyfin-progress {
+            background-color: var(--jellyfin-primary);
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+        
+        .btn-tv {
+            background-color: var(--emby-secondary);
+            color: white;
+        }
+        
+        .btn-tv:hover {
+            background-color: var(--emby-secondary-hover);
+        }
+        
+        .btn-mobile {
+            background-color: var(--emby-primary);
+            color: white;
+        }
+        
+        .btn-mobile:hover {
+            background-color: var(--emby-primary-hover);
+        }
+        
+        .copy-notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            z-index: 1000;
+            display: none;
+            animation: fadeInOut 3s;
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        .estrenos-header {
+            text-align: center;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .estrenos-header h2 {
+            color: var(--text-color);
+            font-size: 1.5rem;
+            background: linear-gradient(90deg, var(--emby-primary), var(--emby-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        
+        .estrenos-header::after {
+            content: "";
+            display: block;
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--emby-primary), var(--emby-secondary));
+            margin: 0 auto;
+            border-radius: 2px;
+        }
+        
+        .semana-info {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--text-light);
+            font-size: 1.1rem;
+        }
+        
+        .semana-info span {
+            color: var(--emby-primary);
+            font-weight: 600;
+        }
+        
+        .estrenos-container {
+            max-width: 100%;
+            max-height: 350px;
+            overflow-x: auto;
+            padding: 10px 0;
+            margin-bottom: 25px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: var(--radius);
+            border: 1px solid var(--emby-primary);
+        }
+        
+        .estrenos-scroll {
+            display: flex;
+            gap: 20px;
+            padding: 15px 20px;
+        }
+        
+        .estreno-card {
+            flex: 0 0 auto;
+            width: 150px;
+            background: rgba(30,30,46,0.8);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            position: relative;
+            border: 1px solid rgba(106,0,255,0.3);
+        }
+        
+        .estreno-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 24px rgba(0,164,255,0.3);
+        }
+        
+        .estreno-poster {
+            width: 100%;
+            height: 225px;
+            object-fit: cover;
+            border-bottom: 1px solid #333;
+        }
+        
+        .estreno-info {
+            padding: 12px;
+        }
+        
+        .estreno-titulo {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            height: 2.8em;
+            text-align: center;
+            color: var(--text-color);
+        }
+        
+        .estreno-fecha {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            text-align: center;
+        }
+        
+        .estreno-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        
+        .badge-reciente {
+            background-color: var(--emby-secondary);
+            color: white;
+        }
+        
+        .badge-proximo {
+            background-color: var(--emby-primary);
+            color: white;
+        }
+        
+        .badge-serie {
+            background-color: var(--jellyfin-primary);
+            color: white;
+            top: 40px !important;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            border-top-color: var(--emby-primary);
+            animation: spin 1s ease-in-out infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            color: var(--text-light);
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .estrenos-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .estrenos-container::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .estrenos-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(var(--emby-primary), var(--emby-secondary));
+            border-radius: 4px;
+        }
+        
+        .no-estrenos {
+            padding: 20px;
+            color: var(--text-light);
+            text-align: center;
+            width: 100%;
+        }
+        
+        .device-cleaner-card {
+            margin-top: 30px;
+        }
+        
+        .device-cleaner-header {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .device-cleaner-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .device-cleaner-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .auto-clean-select {
+            background-color: rgba(42, 42, 74, 0.7);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            min-width: 100px;
+        }
+        
+        .device-list {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 6px;
+            background-color: rgba(42, 42, 74, 0.7);
+        }
+        
+        .device-item {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+            font-size: 13px;
+        }
+        
+        .device-item:last-child {
+            border-bottom: none;
+        }
+        
+        .device-item.to-delete {
+            background-color: rgba(255, 77, 77, 0.1);
+        }
+        
+        .device-info {
+            flex: 1;
+        }
+        
+        .device-name {
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 3px;
+            font-size: 14px;
+        }
+        
+        .device-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 12px;
+            color: var(--text-light);
+        }
+        
+        .device-id {
+            font-family: monospace;
+            font-size: 11px;
+            color: var(--text-light);
+            opacity: 0.7;
+        }
+        
+        .status-message {
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: none;
+            font-size: 13px;
+        }
+        
+        .status-success {
+            background-color: rgba(70, 180, 70, 0.2);
+            color: #81c784;
+            border: 1px solid #81c784;
+        }
+        
+        .status-error {
+            background-color: rgba(255, 77, 77, 0.2);
+            color: #ff4d4d;
+            border: 1px solid #ff4d4d;
+        }
+        
+        .status-info {
+            background-color: rgba(51, 181, 255, 0.2);
+            color: var(--info-color);
+            border: 1px solid var(--info-color);
+        }
+        
+        .network-status {
+            text-align: center;
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: none;
+            font-size: 13px;
+        }
+        
+        .devices-modal .modal-content {
+            max-width: 800px;
+            max-height: 80vh;
+        }
+        
+        .cleaner-btn {
+            padding: 6px 12px;
+            font-size: 13px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        /* Estilos para Jellyfin */
+        .jellyfin .card-title {
+            color: var(--jellyfin-primary);
+        }
+        
+        .jellyfin .form-control:focus {
+            border-color: var(--jellyfin-primary);
+            box-shadow: 0 0 0 3px rgba(255,107,107,0.2);
+        }
+        
+        .jellyfin .btn-tv {
+            background-color: var(--jellyfin-primary);
+        }
+        
+        .jellyfin .btn-tv:hover {
+            background-color: var(--jellyfin-primary-hover);
+        }
+        
+        .jellyfin .btn-mobile {
+            background-color: var(--jellyfin-secondary);
+            color: #333;
+        }
+        
+        .jellyfin .btn-mobile:hover {
+            background-color: var(--jellyfin-secondary-hover);
+            color: #333;
+        }
+        
+        .jellyfin .searchInput:focus {
+            border-color: var(--jellyfin-primary);
+            box-shadow: 0 0 0 3px rgba(255,107,107,0.2);
+        }
+        
+        .jellyfin .estrenos-header h2 {
+            background: linear-gradient(90deg, var(--jellyfin-primary), var(--jellyfin-secondary));
+        }
+        
+        .jellyfin .estrenos-header::after {
+            background: linear-gradient(90deg, var(--jellyfin-primary), var(--jellyfin-secondary));
+        }
+        
+        .jellyfin .semana-info span {
+            color: var(--jellyfin-primary);
+        }
+        
+        .jellyfin .estrenos-container {
+            border: 1px solid var(--jellyfin-primary);
+        }
+        
+        .jellyfin .estrenos-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(var(--jellyfin-primary), var(--jellyfin-secondary));
+        }
+        
+        @media (max-width: 768px) {
+            .users-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .data-actions .btn {
+                min-width: 100%;
+            }
+            
+            .estreno-card {
+                width: 130px;
+            }
+            
+            .estreno-poster {
+                height: 195px;
+            }
+            
+            .device-cleaner-controls {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .floating-buttons-container {
+                bottom: 10px;
+                right: 10px;
+            }
+            
+            .floating-btn {
+                padding: 10px 12px;
+                font-size: 13px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                font-size: 15px;
+                padding: 15px;
+            }
+            
+            .card {
+                padding: 15px;
+            }
+            
+            .card-title {
+                font-size: 20px;
+            }
+            
+            .user-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .user-actions .btn {
+                width: 100%;
+            }
+            
+            .modal-content {
+                margin: 20px auto;
+                width: 95%;
+            }
+            
+            .modal-title {
+                font-size: 20px;
+            }
+            
+            .floating-buttons-container {
+                bottom: 5px;
+                right: 5px;
+            }
+            
+            .floating-btn {
+                padding: 8px 10px;
+                font-size: 12px;
+            }
+            
+            .estreno-card {
+                width: 120px;
+            }
+            
+            .estreno-poster {
+                height: 180px;
+            }
+            
+            .estreno-titulo {
+                font-size: 0.85rem;
+            }
+            
+            .device-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+            
+            .device-details {
+                flex-direction: column;
+                gap: 3px;
+            }
+        }
+    </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="floating-buttons-container">
+        <button id="cleanerBtn" class="floating-btn btn-danger"><i class="fas fa-broom"></i> Limpiar</button>
+        <button id="embyActiveUsersBtn" class="floating-btn btn-primary"><i class="fas fa-users"></i><span id="embyActiveUsersCount" class="count-badge">0</span></button>
+        <button id="jellyfinActiveUsersBtn" class="floating-btn btn-jellyfin"><i class="fas fa-users"></i><span id="jellyfinActiveUsersCount" class="count-badge">0</span></button>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-user-cog"></i> Panel de Control Dual</h1>
+        </div>
+        
+        <div class="card">
+            <div class="estrenos-header"><h2><i class="fas fa-film"></i> ESTRENOS SEMANALES</h2></div>
+            <div class="semana-info">Próximos estrenos y estrenos recientes <span id="semana-actual-texto">esta semana</span></div>
+            <div class="estrenos-container">
+                <div class="estrenos-scroll" id="estrenos-list">
+                    <div style="width:100%;text-align:center;padding:40px 0"><div class="loading"></div><p class="loading-text">Cargando estrenos...</p></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="emby">Emby</div>
+            <div class="tab jellyfin" data-tab="jellyfin">Jellyfin</div>
+        </div>
+        
+        <div id="emby-tab" class="tab-content active">
+            <div class="card">
+                <h2 class="card-title" style="color: var(--emby-primary);"><i class="fas fa-user-plus"></i> Crear Nuevo Usuario en Emby</h2>
+                <form id="embyUserForm">
+                    <div class="form-group"><label for="embyName">Nombre del Usuario:</label><input type="text" id="embyName" class="form-control" required placeholder="Nombre completo o apodo"></div>
+                    <div class="form-group"><label for="embyEmail">Correo Electrónico:</label><input type="email" id="embyEmail" class="form-control" required placeholder="ejemplo@dominio.com"></div>
+                    <div class="form-group"><label for="embyPassword">Contraseña:</label><input type="text" id="embyPassword" class="form-control" required placeholder="Ingrese una contraseña segura"></div>
+                    <div class="form-group"><label for="embyPhone">Número Telefónico (opcional):</label><input type="tel" id="embyPhone" class="form-control" placeholder="+52 123 456 7890"></div>
+                    <div class="form-group"><label for="embyStartDate">Fecha de Inicio:</label><input type="date" id="embyStartDate" class="form-control" required></div>
+                    <div class="form-group"><label for="embyEndDate">Fecha de Finalización:</label><input type="date" id="embyEndDate" class="form-control" required></div>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Crear Usuario</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-search"></i> Buscar Usuarios en Emby</h2>
+                <div class="form-group"><input type="text" id="embySearchInput" class="searchInput" placeholder="Buscar por nombre o correo electrónico..."></div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-users"></i> Lista de Usuarios en Emby</h2>
+                <div id="embyUsersContainer" class="users-grid"></div>
+                <div id="embyEmptyState" class="empty-state" style="display:none">
+                    <i class="fas fa-user-slash"></i>
+                    <h3>No hay usuarios registrados en Emby</h3>
+                    <p>Comienza agregando un nuevo usuario usando el formulario superior</p>
+                </div>
+                <div class="data-actions">
+                    <button class="btn btn-warning" id="embyExportBtn"><i class="fas fa-file-export"></i> Exportar Datos</button>
+                    <button class="btn btn-info" id="embyImportBtn"><i class="fas fa-file-import"></i> Importar Datos</button>
+                    <input type="file" id="embyFileInput" class="fileInput" accept=".json">
+                </div>
+            </div>
+        </div>
+        
+        <div id="jellyfin-tab" class="tab-content jellyfin">
+            <div class="card">
+                <h2 class="card-title" style="color: var(--jellyfin-primary);"><i class="fas fa-user-plus"></i> Crear Nuevo Usuario en Jellyfin</h2>
+                <form id="jellyfinUserForm">
+                    <div class="form-group"><label for="jellyfinName">Nombre del Usuario:</label><input type="text" id="jellyfinName" class="form-control" required placeholder="Nombre completo o apodo"></div>
+                    <div class="form-group"><label for="jellyfinEmail">Correo Electrónico:</label><input type="email" id="jellyfinEmail" class="form-control" required placeholder="ejemplo@dominio.com"></div>
+                    <div class="form-group"><label for="jellyfinPassword">Contraseña:</label><input type="text" id="jellyfinPassword" class="form-control" required placeholder="Ingrese una contraseña segura"></div>
+                    <div class="form-group"><label for="jellyfinPhone">Número Telefónico (opcional):</label><input type="tel" id="jellyfinPhone" class="form-control" placeholder="+52 123 456 7890"></div>
+                    <div class="form-group"><label for="jellyfinStartDate">Fecha de Inicio:</label><input type="date" id="jellyfinStartDate" class="form-control" required></div>
+                    <div class="form-group"><label for="jellyfinEndDate">Fecha de Finalización:</label><input type="date" id="jellyfinEndDate" class="form-control" required></div>
+                    <button type="submit" class="btn btn-jellyfin"><i class="fas fa-save"></i> Crear Usuario</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-search"></i> Buscar Usuarios en Jellyfin</h2>
+                <div class="form-group"><input type="text" id="jellyfinSearchInput" class="searchInput" placeholder="Buscar por nombre o correo electrónico..."></div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-users"></i> Lista de Usuarios en Jellyfin</h2>
+                <div id="jellyfinUsersContainer" class="users-grid"></div>
+                <div id="jellyfinEmptyState" class="empty-state" style="display:none">
+                    <i class="fas fa-user-slash"></i>
+                    <h3>No hay usuarios registrados en Jellyfin</h3>
+                    <p>Comienza agregando un nuevo usuario usando el formulario superior</p>
+                </div>
+                <div class="data-actions">
+                    <button class="btn btn-warning" id="jellyfinExportBtn"><i class="fas fa-file-export"></i> Exportar Datos</button>
+                    <button class="btn btn-info" id="jellyfinImportBtn"><i class="fas fa-file-import"></i> Importar Datos</button>
+                    <input type="file" id="jellyfinFileInput" class="fileInput" accept=".json">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="extendModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Extender Suscripción</div>
+                <span class="close-modal">×</span>
+            </div>
+            <div class="modal-body">
+                <div class="user-info">
+                    <div class="user-name" id="modalUserName"></div>
+                    <span class="user-email" id="modalUserEmail"></span>
+                    <div class="user-dates" style="margin-top:10px">
+                        <div class="date-item"><span class="date-label">Fin actual:</span><span class="date-value" id="modalCurrentEnd"></span></div>
+                        <div class="date-item"><span class="date-label">Nuevo fin:</span><span class="date-value" id="modalNewEnd"></span></div>
+                    </div>
+                </div>
+                <div class="extend-form" style="margin-top:20px">
+                    <label for="extendDays">Agregar días:</label>
+                    <input type="number" id="extendDays" class="extend-input" min="1" value="30">
+                    <button id="confirmExtend" class="btn btn-success">Aplicar</button>
+                </div>
+            </div>
+            <div class="modal-footer"><button id="cancelExtend" class="btn btn-danger">Cancelar</button></div>
+        </div>
+    </div>
+
+    <div id="embyActiveUsersModal" class="modal activeUsersModal">
+        <div class="modal-content" style="max-width:800px">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-tv"></i> Usuarios Activos en Emby (<span id="embyModalActiveCount">0</span>)</div>
+                <span class="close-modal">×</span>
+            </div>
+            <div class="modal-body">
+                <div id="embyActiveUsersContainer" class="users-grid"></div>
+                <div id="embyNoActiveUsers" class="empty-state">
+                    <i class="fas fa-user-clock"></i>
+                    <h3>No hay usuarios activos en Emby</h3>
+                    <p>No se está reproduciendo contenido en Emby en este momento</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="jellyfinActiveUsersModal" class="modal activeUsersModal">
+        <div class="modal-content" style="max-width:800px">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-tv"></i> Usuarios Activos en Jellyfin (<span id="jellyfinModalActiveCount">0</span>)</div>
+                <span class="close-modal">×</span>
+            </div>
+            <div class="modal-body">
+                <div id="jellyfinActiveUsersContainer" class="users-grid"></div>
+                <div id="jellyfinNoActiveUsers" class="empty-state">
+                    <i class="fas fa-user-clock"></i>
+                    <h3>No hay usuarios activos en Jellyfin</h3>
+                    <p>No se está reproduciendo contenido en Jellyfin en este momento</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="devicesModal" class="modal devices-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-broom"></i> Limpiador de Dispositivos</div>
+                <span class="close-modal">×</span>
+            </div>
+            <div class="modal-body">
+                <div class="device-cleaner-header">
+                    <div class="device-cleaner-title"><i class="fas fa-laptop"></i> Dispositivos conectados a Emby</div>
+                    <div class="device-cleaner-controls">
+                        <div class="control-group">
+                            <label for="autoCleanEmby">Auto-limpiar:</label>
+                            <select id="autoCleanEmby" class="auto-clean-select">
+                                <option value="0">Desactivado</option>
+                                <option value="5">5 minutos</option>
+                                <option value="10" selected>10 minutos</option>
+                                <option value="30">30 minutos</option>
+                                <option value="60">60 minutos</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <button id="refreshEmbyDevices" class="cleaner-btn btn-secondary"><i class="fas fa-sync-alt"></i> Actualizar</button>
+                            <button id="cleanEmbyDevices" class="cleaner-btn btn-danger"><i class="fas fa-broom"></i> Limpiar</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="networkStatusEmby" class="network-status"></div>
+                <div id="statusEmbyDevices" class="status-message"></div>
+                <div id="devicesEmby" class="device-list">Cargando dispositivos...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="copyNotification" class="copy-notification" style="display:none"></div>
+
+    <script>
+        const embyConfig = { apiKey: 'd4f8955e60014f1d910f302a822544ec', localUrl: 'http://192.168.1.65:8096', remoteUrl: 'http://mxcuentas.ddns.net:8096', currentUrl: null, localStorageKey: 'embyUsers' };
+        const jellyfinConfig = { apiKey: '3bfb740b86be49a0bd1b6a0771c0020a', localUrl: 'http://192.168.1.65:8081', remoteUrl: 'http://mxcuentas.ddns.net:8081', currentUrl: null, localStorageKey: 'jellyfinUsers' };
+        const extendModal = document.getElementById('extendModal'), closeModal = document.querySelector('.close-modal'), cancelExtend = document.getElementById('cancelExtend'), confirmExtend = document.getElementById('confirmExtend'), extendDaysInput = document.getElementById('extendDays');
+        let currentExtendUserId = null, currentExtendService = null, embyUsers = cargarUsuariosDesdeLocalStorage('emby'), jellyfinUsers = cargarUsuariosDesdeLocalStorage('jellyfin'), deviceCleanerState = { autoCleanInterval: null, currentUrl: null };
+
+        async function esRedLocal(url) { try { const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' }); return true } catch (error) { return false } }
+        async function obtenerUrlServidor(config) { const enLocal = await esRedLocal(config.localUrl); console.log('Estamos en red local:', enLocal); config.currentUrl = enLocal ? config.localUrl : config.remoteUrl; return config.currentUrl }
+        function guardarUsuarios(usuarios, service) { localStorage.setItem(service === 'emby' ? embyConfig.localStorageKey : jellyfinConfig.localStorageKey, JSON.stringify(usuarios)) }
+        function cargarUsuariosDesdeLocalStorage(service) { const usuariosGuardados = localStorage.getItem(service === 'emby' ? embyConfig.localStorageKey : jellyfinConfig.localStorageKey); return usuariosGuardados ? JSON.parse(usuariosGuardados) : [] }
+        function calcularEstado(fechaFin) { if (!fechaFin || fechaFin === 'No definido') { return { diasRestantes: 'No definido', estado: 'warning', estadoClass: 'status-warning', diasClass: 'days-warning' } }
+        const hoy = new Date(), fin = new Date(fechaFin), diferencia = fin - hoy, diasRestantes = Math.ceil(diferencia / (1000 * 60 * 60 * 24)); let estado = 'active', estadoClass = 'status-active', diasClass = 'days-positive'; if (diasRestantes < 0) { estado = 'expired', estadoClass = 'status-expired', diasClass = 'days-negative' } else if (diasRestantes <= 7) { estado = 'warning', estadoClass = 'status-warning', diasClass = 'days-warning' } return { diasRestantes, estado, estadoClass, diasClass } }
+        function formatearFecha(fechaStr) { if (!fechaStr || fechaStr === 'No definido') return fechaStr; const fecha = new Date(fechaStr); return fecha.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' }) }
+        function enviarMensajeWhatsApp(phoneNumber, userName) { const cleanNumber = phoneNumber.replace(/[^\d+]/g, ''), message = `Hola ${userName}, te recordamos que tu suscripción a nuestro servicio está próxima a vencer. No olvides renovar para seguir disfruntando de nuestro contenido. ¡Gracias por ser parte de nuestra comunidad!`; const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`; window.open(whatsappUrl, '_blank') }
+        function copiarInstruccionesTV(email, password) { const texto = `🎟️ *Activación de tv* 🎟️\n\n1.- Ingresaremos a emby en la tv:\n2.- Seleccionaremos:  *SKIP, OMITIR o saltar e introducir la dirección IP*\n\n*add server o conectar al servidor*\nHost o equipo: mxcuentas.ddns.net\nPort: 8096\nSeleccionaremos: *Connect, siguente o  ok*\n\nSeleccionaremos Ingresar usuario manualmente: \n\n📧 Nombre del usuario: ${email || '[correo del usuario]'}\n🔐 Contraseña del usuario: ${password || '[contraseña usuario]'}\n\nQuedará activada su tv\n\n*Recomendación si te pide ingresar los datos del usuario y contraseña, al ingresar nuevamente a EMBY*\n\nVolveremos a iniciar sesión con los datos proporcionados \nCorreo y contraseña\n\nDentro de la interfaz de emby seleccionaremos el icono de:  ajustes ⚙️ \nEn el menú de configuración seleccionaremos \n1.- INICIO  \n2.- Estado de inicio (mostrar inicio de sesión)\n3.- Seleccionaremos (Inicio de sesión auto. Con este usuario)\n\nCuando ingresé nuevamente a EMBY cargará en automático la interfaz. 😀.`; navigator.clipboard.writeText(texto).then(() => { mostrarNotificacion('Instrucciones para TV copiadas al portapapeles') }).catch(err => { console.error('Error al copiar texto: ', err); alert('No se pudo copiar el texto. Por favor copia manualmente.') }) }
+        function copiarInstruccionesMobile(email, password) { const texto = `🎟️ *Activación de CELULAR* 🎟️\n\nIngresaremos a la aplicación *EMBY* en nuestro celular: \n1.-  Seleccionaremos *Next*\n2.-  Seleccionaremos *Skip*\n\nNos va a solicitar los datos para acceder al servidor EMBY:\n\n*Connect to Server*\n*Host:* mxcuentas.ddns.net\n*Port:* 8096\nSeleccionaremos: *Connect o ok*\n\nSeleccionaremos Ingresar usuario manualmente: \n\n*📧 User name:* ${email || '[correo del usuario]'}\n*🔐 Password:* ${password || '[contraseña usuario]'}\n*Seleccionaremos:* Sing In\n\nQuedará activado su celular.\nPor favor de instalar está versión de la aplicación en sus dispositivos móvil :\n*APK EMBY*\nhttps://drive.google.com/file/d/17ynmVbzhmlWsaZXCYHanKH9vZ5eEVX9u/view?usp=drivesdk`; navigator.clipboard.writeText(texto).then(() => { mostrarNotificacion('Instrucciones para Celular copiadas al portapapeles') }).catch(err => { console.error('Error al copiar texto: ', err); alert('No se pudo copiar el texto. Por favor copia manualmente.') }) }
+        function copiarInstruccionesTVJellyfin(email, password) { const texto = `🎟️ *Activación de tv* 🎟️\n\nInstalaremos la aplicación en nuestro dispositivo\nNos va a solicitar el nombre del servidor: \nmxcuentas.ddns.net:8081\n\nAl ingresar nos solicitará Usuario y contraseña:\n*Usuario:* ${email || '[correo del usuario]'}\n*Password:* ${password || '[contraseña del usuario]'}\n\nQuedará activada su TV.`; navigator.clipboard.writeText(texto).then(() => { mostrarNotificacion('Instrucciones para TV (Jellyfin) copiadas al portapapeles') }).catch(err => { console.error('Error al copiar texto: ', err); alert('No se pudo copiar el texto. Por favor copia manualmente.') }) }
+        function copiarInstruccionesMobileJellyfin(email, password) { const texto = `🎟️ *Activación de CELULAR* 🎟️\nInstalaremos la aplicación en nuestro dispositivo\nNos va a solicitar el nombre del servidor: \nmxcuentas.ddns.net:8081\n\nAl ingresar nos solicitará Usuario y contraseña:\n*Usuario:* ${email || '[correo del usuario]'}\n*Password:* ${password || '[contraseña del usuario]'}\n\nQuedará activado su celular.`; navigator.clipboard.writeText(texto).then(() => { mostrarNotificacion('Instrucciones para Celular (Jellyfin) copiadas al portapapeles') }).catch(err => { console.error('Error al copiar texto: ', err); alert('No se pudo copiar el texto. Por favor copia manualmente.') }) }
+        function mostrarNotificacion(mensaje) { const notification = document.getElementById('copyNotification'); notification.textContent = mensaje; notification.style.display = 'block'; setTimeout(() => { notification.style.display = 'none' }, 3000) }
+        function crearTarjetaUsuarioEmby(usuario) { const { diasRestantes, estado, estadoClass, diasClass } = calcularEstado(usuario.endDate); const estadoHTML = `<span class="user-status ${estadoClass}">${estado === 'active' ? 'Activo' : estado === 'warning' ? (diasRestantes === 'No definido' ? 'Sin configurar' : 'Por expirar') : 'Expirado'}</span>`; const diasHTML = `<span class="days-remaining ${diasClass}" onclick="mostrarModalExtender('${usuario.id}','${usuario.name}','${usuario.email}','${usuario.endDate}','emby')">${diasRestantes === 'No definido' ? 'Sin fecha' : (diasRestantes > 0 ? diasRestantes + ' días' : 'Expirado')}</span>`; const whatsappBtn = usuario.phone && (estado === 'warning' || estado === 'expired') ? `<button class="btn ${estado === 'warning' ? 'btn-warning' : 'btn-danger'}" onclick="enviarMensajeWhatsApp('${usuario.phone}','${usuario.name}')"><i class="fab fa-whatsapp"></i> Renovar</button>` : ''; const tvBtn = `<button class="btn btn-sm btn-tv" onclick="copiarInstruccionesTV('${usuario.email || ''}','${usuario.password || ''}')"><i class="fas fa-tv"></i> TV</button>`; const mobileBtn = `<button class="btn btn-sm btn-mobile" onclick="copiarInstruccionesMobile('${usuario.email || ''}','${usuario.password || ''}')"><i class="fas fa-mobile-alt"></i> Celular</button>`; const esNoDefinido = usuario.startDate === 'No definido' || usuario.endDate === 'No definido', startDateValue = esNoDefinido ? '' : usuario.startDate, endDateValue = esNoDefinido ? '' : usuario.endDate; return `<div class="user-card" data-user-id="${usuario.id}" data-service="emby"><div class="user-header"><div><div class="user-name" contenteditable="true" onblur="actualizarNombreUsuario('${usuario.id}',this.textContent,'emby')">${usuario.name || 'Sin nombre'}</div><div class="user-email">${usuario.email}</div>${usuario.phone ? `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'emby')"><i class="fas fa-phone"></i> ${usuario.phone}</div>` : `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'emby')" style="color:var(--text-light)"><i class="fas fa-phone"></i> Agregar teléfono</div>`}</div>${estadoHTML}</div><div class="user-dates"><div class="date-item"><span class="date-label">Inicio:</span>${esNoDefinido ? `<input type="date" class="date-input" value="${startDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','startDate',this.value,'emby')">` : `<span class="date-value">${formatearFecha(usuario.startDate)}</span>`}</div><div class="date-item"><span class="date-label">Fin:</span>${esNoDefinido ? `<input type="date" class="date-input" value="${endDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','endDate',this.value,'emby')">` : `<span class="date-value">${formatearFecha(usuario.endDate)}</span>`}</div></div><div class="user-footer">${diasHTML}<div class="user-actions">${tvBtn}${mobileBtn}${whatsappBtn}<button class="btn btn-danger" onclick="eliminarUsuario('${usuario.id}','emby')"><i class="fas fa-trash-alt"></i></button></div></div></div>` }
+        function editarTelefonoEmby(userId, element) { const usuario = embyUsers.find(u => u.id === userId); if (!usuario) return; const currentPhone = usuario.phone || ''; element.innerHTML = `<i class="fas fa-phone"></i><input type="tel" value="${currentPhone}" style="background:#2a2a2a;color:var(--text-color);border:1px solid var(--border-color);padding:2px 5px;border-radius:4px;width:calc(100% - 25px);" onblur="guardarTelefono('${userId}',this.value,this,'emby')" onkeypress="if(event.key==='Enter')this.blur()">`; const input = element.querySelector('input'); input.focus(); input.select() }
+        function guardarTelefonoEmby(userId, nuevoTelefono, element) { const usuario = embyUsers.find(u => u.id === userId); if (!usuario) return; nuevoTelefono = nuevoTelefono.trim(); usuario.phone = nuevoTelefono || null; guardarUsuarios(embyUsers, 'emby'); if (nuevoTelefono) { element.parentNode.innerHTML = `<i class="fas fa-phone"></i> ${nuevoTelefono}`; element.parentNode.style.color = 'var(--text-color)' } else { element.parentNode.innerHTML = `<i class="fas fa-phone"></i> Agregar teléfono`; element.parentNode.style.color = 'var(--text-light)' } cargarUsuariosEmby() }
+        function actualizarNombreUsuarioEmby(userId, nuevoNombre) { const usuario = embyUsers.find(u => u.id === userId); if (usuario && nuevoNombre.trim() !== '') { usuario.name = nuevoNombre.trim(); guardarUsuarios(embyUsers, 'emby') } }
+        function actualizarFechaUsuarioEmby(userId, tipoFecha, nuevaFecha) { const usuario = embyUsers.find(u => u.id === userId); if (!usuario) return; if (!nuevaFecha) { alert('Por favor ingrese una fecha válida'); return } if (tipoFecha === 'startDate') { const endDate = usuario.endDate === 'No definido' ? null : usuario.endDate; if (endDate && nuevaFecha > endDate) { alert('La fecha de inicio no puede ser mayor que la fecha de fin'); return } } else if (tipoFecha === 'endDate') { const startDate = usuario.startDate === 'No definido' ? null : usuario.startDate; if (startDate && nuevaFecha < startDate) { alert('La fecha de fin no puede ser menor que la fecha de inicio'); return } } usuario[tipoFecha] = nuevaFecha; guardarUsuarios(embyUsers, 'emby'); cargarUsuariosEmby() }
+        function mostrarModalExtender(userId, userName, userEmail, endDate, service) { if (endDate === 'No definido') { alert('Primero debe establecer una fecha de fin para este usuario'); return } currentExtendUserId = userId; currentExtendService = service; document.getElementById('modalUserName').textContent = userName || 'Sin nombre'; document.getElementById('modalUserEmail').textContent = userEmail; document.getElementById('modalCurrentEnd').textContent = formatearFecha(endDate); const fechaFin = new Date(endDate), nuevaFecha = new Date(fechaFin); nuevaFecha.setDate(nuevaFecha.getDate() + 30); document.getElementById('modalNewEnd').textContent = formatearFecha(nuevaFecha.toISOString().split('T')[0]); extendModal.style.display = 'block' }
+        function extenderSuscripcion(userId, dias, service) { let usuarios; if (service === 'emby') { usuarios = embyUsers } else { usuarios = jellyfinUsers } const usuario = usuarios.find(u => u.id === userId); if (!usuario) return; const fechaFin = new Date(usuario.endDate); fechaFin.setDate(fechaFin.getDate() + dias); usuario.endDate = fechaFin.toISOString().split('T')[0]; guardarUsuarios(usuarios, service); if (service === 'emby') { cargarUsuariosEmby() } else { cargarUsuariosJellyfin() } extendModal.style.display = 'none' }
+        async function eliminarUsuarioEmby(userId) { if (confirm('¿Estás seguro de eliminar este usuario de Emby? Esta acción no se puede deshacer.')) { try { const urlServidor = await obtenerUrlServidor(embyConfig), response = await fetch(`${urlServidor}/emby/Users/${userId}?api_key=${embyConfig.apiKey}`, { method: 'DELETE' }); if (response.ok) { embyUsers = embyUsers.filter(u => u.id !== userId); guardarUsuarios(embyUsers, 'emby'); alert('Usuario eliminado correctamente de Emby'); cargarUsuariosEmby() } else { throw new Error('Error al eliminar el usuario') } } catch (error) { console.error('Error:', error); alert('Error al eliminar el usuario de Emby. Verifica tu conexión de red.') } } }
+        async function obtenerUsuariosActivosEmby() { try { const urlServidor = await obtenerUrlServidor(embyConfig), response = await fetch(`${urlServidor}/emby/Sessions?api_key=${embyConfig.apiKey}`); if (!response.ok) throw new Error('Error al obtener sesiones activas de Emby'); const sessions = await response.json(); return sessions.filter(session => session.NowPlayingItem) } catch (error) { console.error('Error al obtener sesiones activas de Emby:', error); return [] } }
+        function crearTarjetaUsuarioActivoEmby(session) { const usuario = embyUsers.find(u => u.id === session.UserId) || { name: session.UserName || 'Usuario desconocido', email: session.UserName || 'sin-email' }, nowPlaying = session.NowPlayingItem, positionTicks = session.PlayState ? session.PlayState.PositionTicks || 0 : 0, runtimeTicks = nowPlaying.RunTimeTicks || 1, progress = Math.min(100, Math.round((positionTicks / runtimeTicks) * 100)), runtime = Math.floor(runtimeTicks / 10000000 / 60), currentPosition = Math.floor(positionTicks / 10000000), formatTime = seconds => { const hrs = Math.floor(seconds / 3600), mins = Math.floor((seconds % 3600) / 60), secs = Math.floor(seconds % 60); return `${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s` }; let itemType = '', icon = '', coverUrl = '', mainTitle = '', subtitle = ''; if (nowPlaying.Type === 'Movie') { itemType = 'Película'; icon = '<i class="fas fa-film"></i>'; mainTitle = nowPlaying.Name || 'Película sin título'; subtitle = itemType; if (nowPlaying.ImageTags && nowPlaying.ImageTags.Primary) { coverUrl = `${embyConfig.currentUrl}/emby/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` } } else if (nowPlaying.Type === 'Episode') { itemType = 'Serie'; icon = '<i class="fas fa-tv"></i>'; mainTitle = nowPlaying.SeriesName || 'Serie sin título'; subtitle = `${itemType} • ${nowPlaying.Name || 'Episodio'}`; if (nowPlaying.IndexNumber) { subtitle += ` (Ep. ${nowPlaying.IndexNumber})` } if (nowPlaying.SeasonName) { subtitle += ` • ${nowPlaying.SeasonName}` } const seriesId = nowPlaying.SeriesId || nowPlaying.ParentBackdropItemId; if (seriesId) { coverUrl = `${embyConfig.currentUrl}/emby/Items/${seriesId}/Images/Primary?maxHeight=200&quality=90` } } else { itemType = 'Contenido'; icon = '<i class="fas fa-play"></i>'; mainTitle = nowPlaying.Name || 'Contenido sin título'; subtitle = itemType; if (nowPlaying.ImageTags && nowPlaying.ImageTags.Primary) { coverUrl = `${embyConfig.currentUrl}/emby/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` } } return `<div class="user-card active-user-card" data-user-id="${session.UserId}" data-session-id="${session.Id}"><div class="active-indicator"></div><div class="user-header"><div><div class="user-name">${usuario.name}</div><div class="user-email">${usuario.email}</div></div><span class="user-status status-active">Reproduciendo</span></div><div class="now-playing-content"><div class="media-cover">${coverUrl ? `<img src="${coverUrl}" alt="${mainTitle}">` : `<div class="media-cover-placeholder"><i class="fas fa-image"></i></div>`}</div><div class="media-info"><div class="media-title">${mainTitle}</div><div class="media-subtitle">${subtitle}</div><div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px"><span style="color:var(--text-light)">${formatTime(currentPosition)}</span><span style="font-weight:500">${progress}%</span><span style="color:var(--text-light)">${formatTime(runtime * 60)}</span></div><div class="progress-container"><div class="progress-bar" style="width:${progress}%" data-progress="${progress}"></div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px"><div><div style="color:var(--text-light)">Inició</div><div>${new Date(session.LastActivityDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div></div><div><div style="color:var(--text-light)">Dispositivo</div><div>${session.DeviceName || 'Desconocido'}</div></div>${session.Client ? `<div><div style="color:var(--text-light)">Cliente</div><div>${session.Client}</div></div>` : ''}${session.PlayState && session.PlayState.PlayMethod ? `<div><div style="color:var(--text-light)">Método</div><div>${session.PlayState.PlayMethod === 'Transcode' ? 'Transcodificado' : 'Directo'}</div></div>` : ''}</div></div></div></div>` }
+        async function actualizarProgresoEnTiempoRealEmby() { try { const urlServidor = await obtenerUrlServidor(embyConfig), response = await fetch(`${urlServidor}/emby/Sessions?api_key=${embyConfig.apiKey}`); if (!response.ok) return; const sessions = await response.json(), activeSessions = sessions.filter(session => session.NowPlayingItem); activeSessions.forEach(session => { const card = document.querySelector(`.user-card[data-session-id="${session.Id}"]`); if (!card) return; const nowPlaying = session.NowPlayingItem, positionTicks = session.PlayState ? session.PlayState.PositionTicks || 0 : 0, runtimeTicks = nowPlaying.RunTimeTicks || 1, progress = Math.min(100, Math.round((positionTicks / runtimeTicks) * 100)), progressBar = card.querySelector('.progress-bar'); if (progressBar) { const currentProgress = parseInt(progressBar.dataset.progress) || 0; if (Math.abs(currentProgress - progress) >= 1) { progressBar.style.width = `${progress}%`; progressBar.dataset.progress = progress; const currentPosition = Math.floor(positionTicks / 10000000), runtime = Math.floor(runtimeTicks / 10000000), formatTime = seconds => { const hrs = Math.floor(seconds / 3600), mins = Math.floor((seconds % 3600) / 60), secs = Math.floor(seconds % 60); return `${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s` }, timeElements = card.querySelectorAll('.progress-container+div span'); if (timeElements.length >= 3) { timeElements[0].textContent = formatTime(currentPosition); timeElements[2].textContent = formatTime(runtime) } const percentElement = timeElements[1]; if (percentElement) { percentElement.textContent = `${progress}%` } } } }) } catch (error) { console.error('Error al actualizar progreso de Emby:', error) } }
+        async function actualizarUsuariosActivosEmby() { const activeSessions = await obtenerUsuariosActivosEmby(), container = document.getElementById('embyActiveUsersContainer'), emptyState = document.getElementById('embyNoActiveUsers'); container.innerHTML = ''; document.getElementById('embyActiveUsersCount').textContent = activeSessions.length; document.getElementById('embyModalActiveCount').textContent = activeSessions.length; if (activeSessions.length === 0) { emptyState.style.display = 'block'; return } emptyState.style.display = 'none'; activeSessions.forEach(session => { container.innerHTML += crearTarjetaUsuarioActivoEmby(session) }) }
+        async function cargarUsuariosEmby() { try { const urlServidor = await obtenerUrlServidor(embyConfig); console.log('Usando URL del servidor de Emby:', urlServidor); const response = await fetch(`${urlServidor}/emby/Users?api_key=${embyConfig.apiKey}`); if (!response.ok) throw new Error('Error al obtener usuarios de Emby'); const data = await response.json(), container = document.getElementById('embyUsersContainer'); container.innerHTML = ''; const emptyState = document.getElementById('embyEmptyState'); if (data.length === 0) { emptyState.style.display = 'block'; return } else { emptyState.style.display = 'none' } data.sort((a, b) => { const dateA = new Date(a.DateCreated || '1970-01-01').getTime(), dateB = new Date(b.DateCreated || '1970-01-01').getTime(); return dateB - dateA }); data.forEach(usuarioEmby => { let usuarioLocal = embyUsers.find(u => u.id === usuarioEmby.Id); if (!usuarioLocal) { usuarioLocal = { id: usuarioEmby.Id, name: 'No definido', email: usuarioEmby.Name, phone: null, startDate: 'No definido', endDate: 'No definido' }; embyUsers.push(usuarioLocal); guardarUsuarios(embyUsers, 'emby') } usuarioLocal.email = usuarioEmby.Name; container.innerHTML += crearTarjetaUsuarioEmby(usuarioLocal) }) } catch (error) { console.error('Error en Emby:', error); alert('Error al conectar con el servidor de Emby. Verifica tu conexión de red.') } }
+        function filtrarUsuariosEmby(searchTerm) { const cards = document.querySelectorAll('#embyUsersContainer .user-card'); let visibleCount = 0; cards.forEach(card => { const name = card.querySelector('.user-name').textContent.toLowerCase(), email = card.querySelector('.user-email').textContent.toLowerCase(), phone = card.querySelector('.user-phone') ? card.querySelector('.user-phone').textContent.toLowerCase() : '', search = searchTerm.toLowerCase(); if (name.includes(search) || email.includes(search) || phone.includes(search)) { card.style.display = ''; visibleCount++ } else { card.style.display = 'none' } }); const emptyState = document.getElementById('embyEmptyState'); if (visibleCount === 0 && searchTerm !== '') { emptyState.style.display = 'block'; emptyState.querySelector('h3').textContent = 'No se encontraron usuarios en Emby'; emptyState.querySelector('p').textContent = 'No hay coincidencias con tu búsqueda' } else { emptyState.style.display = 'none'; if (visibleCount === 0 && searchTerm === '') { emptyState.style.display = 'block'; emptyState.querySelector('h3').textContent = 'No hay usuarios registrados en Emby'; emptyState.querySelector('p').textContent = 'Comienza agregando un nuevo usuario usando el formulario superior' } } }
+        async function detectNetworkForCleaner() { try { const testUrl = embyConfig.localUrl + '/System/Info/Public', response = await fetch(testUrl, { headers: { 'X-Emby-Token': embyConfig.apiKey } }).catch(() => null); if (response && response.ok) { deviceCleanerState.currentUrl = embyConfig.localUrl; showNetworkStatus('Conectado a la red local (LAN)', 'success') } else { deviceCleanerState.currentUrl = embyConfig.remoteUrl; showNetworkStatus('Conectado a la red remota (WAN)', 'info') } loadDevices() } catch (error) { console.error('Error al detectar red:', error); showNetworkStatus('No se pudo conectar a Emby', 'error') } }
+        function showNetworkStatus(message, type) { const networkStatus = document.getElementById('networkStatusEmby'); networkStatus.textContent = `Estado de conexión: ${message}`; networkStatus.className = `network-status status-${type}`; networkStatus.style.display = 'block' }
+        function showCleanerStatus(message, type) { const statusElement = document.getElementById('statusEmbyDevices'); statusElement.textContent = message; statusElement.className = `status-message status-${type}`; statusElement.style.display = 'block'; if (type !== 'error') { setTimeout(() => { statusElement.style.display = 'none' }, 5000) } }
+        async function loadDevices() { if (!deviceCleanerState.currentUrl) { showCleanerStatus('Esperando detección de red...', 'info'); return } try { showCleanerStatus('Cargando dispositivos...', 'info'); const response = await fetch(`${deviceCleanerState.currentUrl}/Devices`, { headers: { 'X-Emby-Token': embyConfig.apiKey } }); if (!response.ok) { throw new Error(`Error ${response.status}: ${response.statusText}`) } const devices = await response.json(); displayDevices(devices.Items); showCleanerStatus(`${devices.Items.length} dispositivos cargados`, 'success') } catch (error) { console.error('Error al cargar dispositivos:', error); showCleanerStatus(`Error: ${error.message}`, 'error'); document.getElementById('devicesEmby').innerHTML = `Error al cargar dispositivos: ${error.message}` } }
+        function displayDevices(devices) { const now = new Date(), container = document.getElementById('devicesEmby'); container.innerHTML = ''; if (devices.length === 0) { container.innerHTML = '<div class="device-item">No hay dispositivos</div>'; return } devices.sort((a, b) => new Date(a.DateLastActivity || 0) - new Date(b.DateLastActivity || 0)); devices.forEach(device => { const lastActive = device.DateLastActivity ? new Date(device.DateLastActivity) : null, minutesInactive = lastActive ? Math.floor((now - lastActive) / (1000 * 60)) : null, isInactive = minutesInactive !== null && minutesInactive > 10, deviceElement = document.createElement('div'); deviceElement.className = `device-item ${isInactive ? 'to-delete' : ''}`; deviceElement.innerHTML = `<div class="device-info"><div class="device-name">${device.Name || 'Desconocido'}</div><div class="device-details"><span>ID: ${device.Id}</span>${lastActive ? `<span>Última actividad: ${lastActive.toLocaleString()}</span><span>Inactivo: ${minutesInactive} minutos</span>` : '<span>Nunca activo</span>'}</div></div>`; container.appendChild(deviceElement) }) }
+        async function cleanInactiveDevices() { if (!deviceCleanerState.currentUrl) { showCleanerStatus('Esperando detección de red...', 'info'); return } try { showCleanerStatus('Buscando dispositivos inactivos...', 'info'); const response = await fetch(`${deviceCleanerState.currentUrl}/Devices`, { headers: { 'X-Emby-Token': embyConfig.apiKey } }); if (!response.ok) { throw new Error(`Error ${response.status}: ${response.statusText}`) } const devices = await response.json(), now = new Date(), inactiveDevices = devices.Items.filter(device => { if (!device.DateLastActivity) return true; const lastActive = new Date(device.DateLastActivity), minutesInactive = Math.floor((now - lastActive) / (1000 * 60)); return minutesInactive > 10 }); if (inactiveDevices.length === 0) { showCleanerStatus('No hay dispositivos inactivos para eliminar', 'info'); return } showCleanerStatus(`Eliminando ${inactiveDevices.length} dispositivos inactivos...`, 'info'); let deletedCount = 0; for (const device of inactiveDevices) { try { const deleteResponse = await fetch(`${deviceCleanerState.currentUrl}/Devices`, { method: 'DELETE', headers: { 'X-Emby-Token': embyConfig.apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ Id: device.Id }) }); if (deleteResponse.ok) { deletedCount++ } else { console.error(`Error al eliminar dispositivo ${device.Id}:`, deleteResponse.statusText) } } catch (error) { console.error(`Error al eliminar dispositivo ${device.Id}:`, error) } } showCleanerStatus(`Se eliminaron ${deletedCount} dispositivos inactivos`, 'success'); loadDevices() } catch (error) { console.error('Error al limpiar dispositivos:', error); showCleanerStatus(`Error: ${error.message}`, 'error') } }
+        function setupAutoClean(minutes) { if (deviceCleanerState.autoCleanInterval) { clearInterval(deviceCleanerState.autoCleanInterval); deviceCleanerState.autoCleanInterval = null } if (minutes > 0) { deviceCleanerState.autoCleanInterval = setInterval(() => { cleanInactiveDevices() }, minutes * 60 * 1000); showCleanerStatus(`Auto-limpieza configurada cada ${minutes} minutos`, 'info') } else { showCleanerStatus('Auto-limpieza desactivada', 'info') } }
+        function crearTarjetaUsuarioJellyfin(usuario) { const { diasRestantes, estado, estadoClass, diasClass } = calcularEstado(usuario.endDate); const estadoHTML = `<span class="user-status ${estadoClass}">${estado === 'active' ? 'Activo' : estado === 'warning' ? (diasRestantes === 'No definido' ? 'Sin configurar' : 'Por expirar') : 'Expirado'}</span>`; const diasHTML = `<span class="days-remaining ${diasClass}" onclick="mostrarModalExtender('${usuario.id}','${usuario.name}','${usuario.email}','${usuario.endDate}','jellyfin')">${diasRestantes === 'No definido' ? 'Sin fecha' : (diasRestantes > 0 ? diasRestantes + ' días' : 'Expirado')}</span>`; const whatsappBtn = usuario.phone && (estado === 'warning' || estado === 'expired') ? `<button class="btn ${estado === 'warning' ? 'btn-warning' : 'btn-danger'}" onclick="enviarMensajeWhatsApp('${usuario.phone}','${usuario.name}')"><i class="fab fa-whatsapp"></i> Renovar</button>` : ''; const tvBtn = `<button class="btn btn-sm btn-tv" onclick="copiarInstruccionesTVJellyfin('${usuario.email || ''}','${usuario.password || ''}')"><i class="fas fa-tv"></i> TV</button>`; const mobileBtn = `<button class="btn btn-sm btn-mobile" onclick="copiarInstruccionesMobileJellyfin('${usuario.email || ''}','${usuario.password || ''}')"><i class="fas fa-mobile-alt"></i> Celular</button>`; const esNoDefinido = usuario.startDate === 'No definido' || usuario.endDate === 'No definido', startDateValue = esNoDefinido ? '' : usuario.startDate, endDateValue = esNoDefinido ? '' : usuario.endDate; return `<div class="user-card" data-user-id="${usuario.id}" data-service="jellyfin"><div class="user-header"><div><div class="user-name" contenteditable="true" onblur="actualizarNombreUsuario('${usuario.id}',this.textContent,'jellyfin')">${usuario.name || 'Sin nombre'}</div><div class="user-email">${usuario.email}</div>${usuario.phone ? `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'jellyfin')"><i class="fas fa-phone"></i> ${usuario.phone}</div>` : `<div class="user-phone" onclick="editarTelefono('${usuario.id}',this,'jellyfin')" style="color:var(--text-light)"><i class="fas fa-phone"></i> Agregar teléfono</div>`}</div>${estadoHTML}</div><div class="user-dates"><div class="date-item"><span class="date-label">Inicio:</span>${esNoDefinido ? `<input type="date" class="date-input" value="${startDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','startDate',this.value,'jellyfin')">` : `<span class="date-value">${formatearFecha(usuario.startDate)}</span>`}</div><div class="date-item"><span class="date-label">Fin:</span>${esNoDefinido ? `<input type="date" class="date-input" value="${endDateValue}" onchange="actualizarFechaUsuario('${usuario.id}','endDate',this.value,'jellyfin')">` : `<span class="date-value">${formatearFecha(usuario.endDate)}</span>`}</div></div><div class="user-footer">${diasHTML}<div class="user-actions">${tvBtn}${mobileBtn}${whatsappBtn}<button class="btn btn-danger" onclick="eliminarUsuario('${usuario.id}','jellyfin')"><i class="fas fa-trash-alt"></i></button></div></div></div>` }
+        function editarTelefonoJellyfin(userId, element) { const usuario = jellyfinUsers.find(u => u.id === userId); if (!usuario) return; const currentPhone = usuario.phone || ''; element.innerHTML = `<i class="fas fa-phone"></i><input type="tel" value="${currentPhone}" style="background:#2a2a2a;color:var(--text-color);border:1px solid var(--border-color);padding:2px 5px;border-radius:4px;width:calc(100% - 25px);" onblur="guardarTelefono('${userId}',this.value,this,'jellyfin')" onkeypress="if(event.key==='Enter')this.blur()">`; const input = element.querySelector('input'); input.focus(); input.select() }
+        function guardarTelefonoJellyfin(userId, nuevoTelefono, element) { const usuario = jellyfinUsers.find(u => u.id === userId); if (!usuario) return; nuevoTelefono = nuevoTelefono.trim(); usuario.phone = nuevoTelefono || null; guardarUsuarios(jellyfinUsers, 'jellyfin'); if (nuevoTelefono) { element.parentNode.innerHTML = `<i class="fas fa-phone"></i> ${nuevoTelefono}`; element.parentNode.style.color = 'var(--text-color)' } else { element.parentNode.innerHTML = `<i class="fas fa-phone"></i> Agregar teléfono`; element.parentNode.style.color = 'var(--text-light)' } cargarUsuariosJellyfin() }
+        function actualizarNombreUsuarioJellyfin(userId, nuevoNombre) { const usuario = jellyfinUsers.find(u => u.id === userId); if (usuario && nuevoNombre.trim() !== '') { usuario.name = nuevoNombre.trim(); guardarUsuarios(jellyfinUsers, 'jellyfin') } }
+        function actualizarFechaUsuarioJellyfin(userId, tipoFecha, nuevaFecha) { const usuario = jellyfinUsers.find(u => u.id === userId); if (!usuario) return; if (!nuevaFecha) { alert('Por favor ingrese una fecha válida'); return } if (tipoFecha === 'startDate') { const endDate = usuario.endDate === 'No definido' ? null : usuario.endDate; if (endDate && nuevaFecha > endDate) { alert('La fecha de inicio no puede ser mayor que la fecha de fin'); return } } else if (tipoFecha === 'endDate') { const startDate = usuario.startDate === 'No definido' ? null : usuario.startDate; if (startDate && nuevaFecha < startDate) { alert('La fecha de fin no puede ser menor que la fecha de inicio'); return } } usuario[tipoFecha] = nuevaFecha; guardarUsuarios(jellyfinUsers, 'jellyfin'); cargarUsuariosJellyfin() }
+        async function eliminarUsuarioJellyfin(userId) { if (confirm('¿Estás seguro de eliminar este usuario de Jellyfin? Esta acción no se puede deshacer.')) { try { const urlServidor = await obtenerUrlServidor(jellyfinConfig), response = await fetch(`${urlServidor}/Users/${userId}?api_key=${jellyfinConfig.apiKey}`, { method: 'DELETE' }); if (response.ok) { jellyfinUsers = jellyfinUsers.filter(u => u.id !== userId); guardarUsuarios(jellyfinUsers, 'jellyfin'); alert('Usuario eliminado correctamente de Jellyfin'); cargarUsuariosJellyfin() } else { throw new Error('Error al eliminar el usuario') } } catch (error) { console.error('Error:', error); alert('Error al eliminar el usuario de Jellyfin. Verifica tu conexión de red.') } } }
+        async function obtenerUsuariosActivosJellyfin() { try { const urlServidor = await obtenerUrlServidor(jellyfinConfig), response = await fetch(`${urlServidor}/Sessions?api_key=${jellyfinConfig.apiKey}`); if (!response.ok) throw new Error('Error al obtener sesiones activas de Jellyfin'); const sessions = await response.json(); return sessions.filter(session => session.NowPlayingItem) } catch (error) { console.error('Error al obtener sesiones activas de Jellyfin:', error); return [] } }
+        function crearTarjetaUsuarioActivoJellyfin(session) { const usuario = jellyfinUsers.find(u => u.id === session.UserId) || { name: session.UserName || 'Usuario desconocido', email: session.UserName || 'sin-email' }, nowPlaying = session.NowPlayingItem, positionTicks = session.PlayState ? session.PlayState.PositionTicks || 0 : 0, runtimeTicks = nowPlaying.RunTimeTicks || 1, progress = Math.min(100, Math.round((positionTicks / runtimeTicks) * 100)), runtime = Math.floor(runtimeTicks / 10000000 / 60), currentPosition = Math.floor(positionTicks / 10000000), formatTime = seconds => { const hrs = Math.floor(seconds / 3600), mins = Math.floor((seconds % 3600) / 60), secs = Math.floor(seconds % 60); return `${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s` }; let itemType = '', icon = '', coverUrl = '', mainTitle = '', subtitle = ''; if (nowPlaying.Type === 'Movie') { itemType = 'Película'; icon = '<i class="fas fa-film"></i>'; mainTitle = nowPlaying.Name || 'Película sin título'; subtitle = itemType; if (nowPlaying.ImageTags && nowPlaying.ImageTags.Primary) { coverUrl = `${jellyfinConfig.currentUrl}/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` } } else if (nowPlaying.Type === 'Episode') { itemType = 'Serie'; icon = '<i class="fas fa-tv"></i>'; mainTitle = nowPlaying.SeriesName || 'Serie sin título'; subtitle = `${itemType} • ${nowPlaying.Name || 'Episodio'}`; if (nowPlaying.IndexNumber) { subtitle += ` (Ep. ${nowPlaying.IndexNumber})` } if (nowPlaying.SeasonName) { subtitle += ` • ${nowPlaying.SeasonName}` } const seriesId = nowPlaying.SeriesId || nowPlaying.ParentBackdropItemId; if (seriesId) { coverUrl = `${jellyfinConfig.currentUrl}/Items/${seriesId}/Images/Primary?maxHeight=200&quality=90` } } else { itemType = 'Contenido'; icon = '<i class="fas fa-play"></i>'; mainTitle = nowPlaying.Name || 'Contenido sin título'; subtitle = itemType; if (nowPlaying.ImageTags && nowPlaying.ImageTags.Primary) { coverUrl = `${jellyfinConfig.currentUrl}/Items/${nowPlaying.Id}/Images/Primary?maxHeight=200&quality=90` } } return `<div class="user-card active-user-card jellyfin-active-card" data-user-id="${session.UserId}" data-session-id="${session.Id}"><div class="active-indicator"></div><div class="user-header"><div><div class="user-name">${usuario.name}</div><div class="user-email">${usuario.email}</div></div><span class="user-status status-active">Reproduciendo</span></div><div class="now-playing-content"><div class="media-cover">${coverUrl ? `<img src="${coverUrl}" alt="${mainTitle}">` : `<div class="media-cover-placeholder"><i class="fas fa-image"></i></div>`}</div><div class="media-info"><div class="media-title">${mainTitle}</div><div class="media-subtitle">${subtitle}</div><div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px"><span style="color:var(--text-light)">${formatTime(currentPosition)}</span><span style="font-weight:500">${progress}%</span><span style="color:var(--text-light)">${formatTime(runtime * 60)}</span></div><div class="progress-container"><div class="progress-bar jellyfin-progress" style="width:${progress}%" data-progress="${progress}"></div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px"><div><div style="color:var(--text-light)">Inició</div><div>${new Date(session.LastActivityDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div></div><div><div style="color:var(--text-light)">Dispositivo</div><div>${session.DeviceName || 'Desconocido'}</div></div>${session.Client ? `<div><div style="color:var(--text-light)">Cliente</div><div>${session.Client}</div></div>` : ''}${session.PlayState && session.PlayState.PlayMethod ? `<div><div style="color:var(--text-light)">Método</div><div>${session.PlayState.PlayMethod === 'Transcode' ? 'Transcodificado' : 'Directo'}</div></div>` : ''}</div></div></div></div>` }
+        async function actualizarProgresoEnTiempoRealJellyfin() { try { const urlServidor = await obtenerUrlServidor(jellyfinConfig), response = await fetch(`${urlServidor}/Sessions?api_key=${jellyfinConfig.apiKey}`); if (!response.ok) return; const sessions = await response.json(), activeSessions = sessions.filter(session => session.NowPlayingItem); activeSessions.forEach(session => { const card = document.querySelector(`.user-card[data-session-id="${session.Id}"]`); if (!card) return; const nowPlaying = session.NowPlayingItem, positionTicks = session.PlayState ? session.PlayState.PositionTicks || 0 : 0, runtimeTicks = nowPlaying.RunTimeTicks || 1, progress = Math.min(100, Math.round((positionTicks / runtimeTicks) * 100)), progressBar = card.querySelector('.progress-bar'); if (progressBar) { const currentProgress = parseInt(progressBar.dataset.progress) || 0; if (Math.abs(currentProgress - progress) >= 1) { progressBar.style.width = `${progress}%`; progressBar.dataset.progress = progress; const currentPosition = Math.floor(positionTicks / 10000000), runtime = Math.floor(runtimeTicks / 10000000), formatTime = seconds => { const hrs = Math.floor(seconds / 3600), mins = Math.floor((seconds % 3600) / 60), secs = Math.floor(seconds % 60); return `${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s` }, timeElements = card.querySelectorAll('.progress-container+div span'); if (timeElements.length >= 3) { timeElements[0].textContent = formatTime(currentPosition); timeElements[2].textContent = formatTime(runtime) } const percentElement = timeElements[1]; if (percentElement) { percentElement.textContent = `${progress}%` } } } }) } catch (error) { console.error('Error al actualizar progreso de Jellyfin:', error) } }
+        async function actualizarUsuariosActivosJellyfin() { const activeSessions = await obtenerUsuariosActivosJellyfin(), container = document.getElementById('jellyfinActiveUsersContainer'), emptyState = document.getElementById('jellyfinNoActiveUsers'); container.innerHTML = ''; document.getElementById('jellyfinActiveUsersCount').textContent = activeSessions.length; document.getElementById('jellyfinModalActiveCount').textContent = activeSessions.length; if (activeSessions.length === 0) { emptyState.style.display = 'block'; return } emptyState.style.display = 'none'; activeSessions.forEach(session => { container.innerHTML += crearTarjetaUsuarioActivoJellyfin(session) }) }
+        async function cargarUsuariosJellyfin() { try { const urlServidor = await obtenerUrlServidor(jellyfinConfig); console.log('Usando URL del servidor de Jellyfin:', urlServidor); const response = await fetch(`${urlServidor}/Users?api_key=${jellyfinConfig.apiKey}`); if (!response.ok) throw new Error('Error al obtener usuarios de Jellyfin'); const data = await response.json(), container = document.getElementById('jellyfinUsersContainer'); container.innerHTML = ''; const emptyState = document.getElementById('jellyfinEmptyState'); if (data.length === 0) { emptyState.style.display = 'block'; return } else { emptyState.style.display = 'none' } data.sort((a, b) => { const dateA = new Date(a.DateCreated || '1970-01-01').getTime(), dateB = new Date(b.DateCreated || '1970-01-01').getTime(); return dateB - dateA }); data.forEach(usuarioJellyfin => { let usuarioLocal = jellyfinUsers.find(u => u.id === usuarioJellyfin.Id); if (!usuarioLocal) { usuarioLocal = { id: usuarioJellyfin.Id, name: 'No definido', email: usuarioJellyfin.Name, phone: null, startDate: 'No definido', endDate: 'No definido' }; jellyfinUsers.push(usuarioLocal); guardarUsuarios(jellyfinUsers, 'jellyfin') } usuarioLocal.email = usuarioJellyfin.Name; container.innerHTML += crearTarjetaUsuarioJellyfin(usuarioLocal) }) } catch (error) { console.error('Error en Jellyfin:', error); alert('Error al conectar con el servidor de Jellyfin. Verifica tu conexión de red.') } }
+        function filtrarUsuariosJellyfin(searchTerm) { const cards = document.querySelectorAll('#jellyfinUsersContainer .user-card'); let visibleCount = 0; cards.forEach(card => { const name = card.querySelector('.user-name').textContent.toLowerCase(), email = card.querySelector('.user-email').textContent.toLowerCase(), phone = card.querySelector('.user-phone') ? card.querySelector('.user-phone').textContent.toLowerCase() : '', search = searchTerm.toLowerCase(); if (name.includes(search) || email.includes(search) || phone.includes(search)) { card.style.display = ''; visibleCount++ } else { card.style.display = 'none' } }); const emptyState = document.getElementById('jellyfinEmptyState'); if (visibleCount === 0 && searchTerm !== '') { emptyState.style.display = 'block'; emptyState.querySelector('h3').textContent = 'No se encontraron usuarios en Jellyfin'; emptyState.querySelector('p').textContent = 'No hay coincidencias con tu búsqueda' } else { emptyState.style.display = 'none'; if (visibleCount === 0 && searchTerm === '') { emptyState.style.display = 'block'; emptyState.querySelector('h3').textContent = 'No hay usuarios registrados en Jellyfin'; emptyState.querySelector('p').textContent = 'Comienza agregando un nuevo usuario usando el formulario superior' } } }
+        function editarTelefono(userId, element, service) { if (service === 'emby') { editarTelefonoEmby(userId, element) } else { editarTelefonoJellyfin(userId, element) } }
+        function guardarTelefono(userId, nuevoTelefono, element, service) { if (service === 'emby') { guardarTelefonoEmby(userId, nuevoTelefono, element) } else { guardarTelefonoJellyfin(userId, nuevoTelefono, element) } }
+        function actualizarNombreUsuario(userId, nuevoNombre, service) { if (service === 'emby') { actualizarNombreUsuarioEmby(userId, nuevoNombre) } else { actualizarNombreUsuarioJellyfin(userId, nuevoNombre) } }
+        function actualizarFechaUsuario(userId, tipoFecha, nuevaFecha, service) { if (service === 'emby') { actualizarFechaUsuarioEmby(userId, tipoFecha, nuevaFecha) } else { actualizarFechaUsuarioJellyfin(userId, tipoFecha, nuevaFecha) } }
+        function eliminarUsuario(userId, service) { if (service === 'emby') { eliminarUsuarioEmby(userId) } else { eliminarUsuarioJellyfin(userId) } }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const apiKey = 'e22418df765186e2208cf44bef9e3bd2', estrenosList = document.getElementById('estrenos-list'), semanaTexto = document.getElementById('semana-actual-texto');
+            function getFechasSemana() { const hoy = new Date(), diaSemana = hoy.getDay(), diff = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1), inicioSemana = new Date(hoy.setDate(diff)), finSemana = new Date(inicioSemana); finSemana.setDate(finSemana.getDate() + 6); return { inicioSemana, finSemana } }
+            function formatearFecha(fecha) { const options = { day: 'numeric', month: 'long' }; return fecha.toLocaleDateString('es-MX', options) }
+            function actualizarTextoSemana(inicio, fin) { semanaTexto.textContent = `del ${formatearFecha(inicio)} al ${formatearFecha(fin)}` }
+            async function getEstrenos() { const { inicioSemana, finSemana } = getFechasSemana(); actualizarTextoSemana(inicioSemana, finSemana); const formatDate = date => date.toISOString().split('T')[0], hoy = new Date(), hace7Dias = new Date(hoy); hace7Dias.setDate(hoy.getDate() - 7); const fechaInicio = formatDate(hace7Dias), fechaFin = formatDate(finSemana), hoyStr = formatDate(hoy); try { const responseMovies = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&language=es-MX®ion=MX&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&primary_release_date.gte=${fechaInicio}&primary_release_date.lte=${fechaFin}`), dataMovies = await responseMovies.json(), responseTV = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${apiKey}&language=es-MX®ion=MX&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&first_air_date.gte=${fechaInicio}&first_air_date.lte=${fechaFin}`), dataTV = await responseTV.json(), proximosMovies = dataMovies.results.filter(movie => movie.release_date >= hoyStr).sort((a, b) => new Date(a.release_date) - new Date(b.release_date)), recientesMovies = dataMovies.results.filter(movie => movie.release_date < hoyStr).sort((a, b) => new Date(b.release_date) - new Date(a.release_date)), proximosTV = dataTV.results.filter(serie => serie.first_air_date >= hoyStr).sort((a, b) => new Date(a.first_air_date) - new Date(b.first_air_date)), recientesTV = dataTV.results.filter(serie => serie.first_air_date < hoyStr).sort((a, b) => new Date(b.first_air_date) - new Date(a.first_air_date)), todosProximos = [...proximosMovies, ...proximosTV], todosRecientes = [...recientesMovies, ...recientesTV]; return { proximos: todosProximos.sort((a, b) => { const fechaA = a.release_date || a.first_air_date, fechaB = b.release_date || b.first_air_date; return new Date(fechaA) - new Date(fechaB) }), recientes: todosRecientes.sort((a, b) => { const fechaA = a.release_date || a.first_air_date, fechaB = b.release_date || b.first_air_date; return new Date(fechaB) - new Date(fechaA) }) } } catch (error) { console.error('Error al obtener estrenos:', error); return { proximos: [], recientes: [] } } }
+            function crearCardEstreno(estreno, esProximo) { if (!estreno.poster_path) return null; const card = document.createElement('div'); card.className = 'estreno-card'; const esSerie = estreno.first_air_date !== undefined, titulo = estreno.title || estreno.name, fechaEstreno = esSerie ? (estreno.first_air_date ? new Date(estreno.first_air_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : 'Próximamente') : (estreno.release_date ? new Date(estreno.release_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : 'Próximamente'), badgeClass = esProximo ? 'badge-proximo' : 'badge-reciente', badgeText = esProximo ? 'PRÓXIMO' : 'ESTRENADA'; card.innerHTML = `<img src="https://image.tmdb.org/t/p/w500${estreno.poster_path}" alt="${titulo}" class="estreno-poster" onerror="this.src='https://via.placeholder.com/500x750/181818/ffffff?text=Poster+no+disponible'"><div class="estreno-badge ${badgeClass}">${badgeText}</div>${esSerie ? '<div class="estreno-badge badge-serie">SERIE</div>' : ''}<div class="estreno-info"><div class="estreno-titulo">${titulo}</div><div class="estreno-fecha">${esSerie ? 'Estreno:' : 'Estreno:'} ${fechaEstreno}</div></div>`; return card }
+            async function mostrarEstrenos() { const { proximos, recientes } = await getEstrenos(); estrenosList.innerHTML = ''; if (proximos.length === 0 && recientes.length === 0) { estrenosList.innerHTML = '<p class="no-estrenos">No hay estrenos esta semana</p>'; return } [...proximos, ...recientes].forEach(estreno => { const esProximo = estreno.release_date ? (estreno.release_date >= new Date().toISOString().split('T')[0]) : (estreno.first_air_date >= new Date().toISOString().split('T')[0]), card = crearCardEstreno(estreno, esProximo); if (card) estrenosList.appendChild(card) }) }
+            function iniciar() { mostrarEstrenos(); setInterval(() => { const ahora = new Date(); if (ahora.getDay() === 1 && ahora.getHours() === 0) { location.reload() } }, 60 * 60 * 1000) }
+            iniciar();
+            
+            cargarUsuariosEmby(); cargarUsuariosJellyfin();
+            const hoy = new Date().toISOString().split('T')[0];
+            document.getElementById('embyStartDate').min = hoy; document.getElementById('embyEndDate').min = hoy; document.getElementById('jellyfinStartDate').min = hoy; document.getElementById('jellyfinEndDate').min = hoy;
+            document.getElementById('embyStartDate').addEventListener('change', function() { const startDate = this.value; document.getElementById('embyEndDate').min = startDate; if (document.getElementById('embyEndDate').value < startDate) { document.getElementById('embyEndDate').value = startDate } });
+            document.getElementById('jellyfinStartDate').addEventListener('change', function() { const startDate = this.value; document.getElementById('jellyfinEndDate').min = startDate; if (document.getElementById('jellyfinEndDate').value < startDate) { document.getElementById('jellyfinEndDate').value = startDate } });
+            setInterval(actualizarUsuariosActivosEmby, 30000); setInterval(actualizarProgresoEnTiempoRealEmby, 5000); setInterval(actualizarUsuariosActivosJellyfin, 30000); setInterval(actualizarProgresoEnTiempoRealJellyfin, 5000);
+            actualizarUsuariosActivosEmby(); actualizarProgresoEnTiempoRealEmby(); actualizarUsuariosActivosJellyfin(); actualizarProgresoEnTiempoRealJellyfin();
+            detectNetworkForCleaner(); setupAutoClean(10);
+        });
+
+        document.getElementById('embyUserForm').addEventListener('submit', async function(e) { e.preventDefault(); const name = document.getElementById('embyName').value.trim(), email = document.getElementById('embyEmail').value.trim(), password = document.getElementById('embyPassword').value.trim(), phone = document.getElementById('embyPhone').value.trim(), startDate = document.getElementById('embyStartDate').value, endDate = document.getElementById('embyEndDate').value; if (!name || !email || !password || !startDate || !endDate) { alert('Por favor complete todos los campos requeridos'); return } try { const urlServidor = await obtenerUrlServidor(embyConfig), response = await fetch(`${urlServidor}/emby/Users/New?api_key=${embyConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ Name: email, Password: password }) }); if (response.ok) { const nuevoUsuario = await response.json(); embyUsers.push({ id: nuevoUsuario.Id, name: name, email: email, password: password, phone: phone || null, startDate: startDate, endDate: endDate }); guardarUsuarios(embyUsers, 'emby'); alert('Usuario creado correctamente en Emby'); cargarUsuariosEmby(); document.getElementById('embyUserForm').reset() } else { throw new Error('Error al crear el usuario en Emby') } } catch (error) { console.error('Error:', error); alert('Error al crear el usuario en Emby. Verifica tu conexión de red.') } });
+        document.getElementById('jellyfinUserForm').addEventListener('submit', async function(e) { e.preventDefault(); const name = document.getElementById('jellyfinName').value.trim(), email = document.getElementById('jellyfinEmail').value.trim(), password = document.getElementById('jellyfinPassword').value.trim(), phone = document.getElementById('jellyfinPhone').value.trim(), startDate = document.getElementById('jellyfinStartDate').value, endDate = document.getElementById('jellyfinEndDate').value; if (!name || !email || !password || !startDate || !endDate) { alert('Por favor complete todos los campos requeridos'); return } try { const urlServidor = await obtenerUrlServidor(jellyfinConfig), response = await fetch(`${urlServidor}/Users/New?api_key=${jellyfinConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ Name: email, Password: password }) }); if (response.ok) { const nuevoUsuario = await response.json(); jellyfinUsers.push({ id: nuevoUsuario.Id, name: name, email: email, password: password, phone: phone || null, startDate: startDate, endDate: endDate }); guardarUsuarios(jellyfinUsers, 'jellyfin'); alert('Usuario creado correctamente en Jellyfin'); cargarUsuariosJellyfin(); document.getElementById('jellyfinUserForm').reset() } else { throw new Error('Error al crear el usuario en Jellyfin') } } catch (error) { console.error('Error:', error); alert('Error al crear el usuario en Jellyfin. Verifica tu conexión de red.') } });
+        document.getElementById('embyExportBtn').addEventListener('click', function() { const usuarios = cargarUsuariosDesdeLocalStorage('emby'); if (usuarios.length === 0) { alert('No hay datos para exportar de Emby'); return } const dataStr = JSON.stringify(usuarios, null, 2), blob = new Blob([dataStr], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = `usuarios_emby_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); alert(`Se han exportado ${usuarios.length} usuarios de Emby correctamente`) });
+        document.getElementById('embyImportBtn').addEventListener('click', function() { document.getElementById('embyFileInput').click() });
+        document.getElementById('embyFileInput').addEventListener('change', function(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { try { const contenido = e.target.result, datosImportados = JSON.parse(contenido); if (!Array.isArray(datosImportados)) { throw new Error('Formato de archivo inválido') } if (confirm(`¿Importar ${datosImportados.length} usuarios a Emby? Esto sobrescribirá los datos actuales.`)) { localStorage.setItem(embyConfig.localStorageKey, JSON.stringify(datosImportados)); embyUsers = datosImportados; alert('Datos importados correctamente a Emby'); cargarUsuariosEmby() } } catch (error) { console.error('Error al importar:', error); alert('Error al importar el archivo. Verifica que sea un JSON válido.') } }; reader.readAsText(file); event.target.value = '' });
+        document.getElementById('jellyfinExportBtn').addEventListener('click', function() { const usuarios = cargarUsuariosDesdeLocalStorage('jellyfin'); if (usuarios.length === 0) { alert('No hay datos para exportar de Jellyfin'); return } const dataStr = JSON.stringify(usuarios, null, 2), blob = new Blob([dataStr], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = `usuarios_jellyfin_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); alert(`Se han exportado ${usuarios.length} usuarios de Jellyfin correctamente`) });
+        document.getElementById('jellyfinImportBtn').addEventListener('click', function() { document.getElementById('jellyfinFileInput').click() });
+        document.getElementById('jellyfinFileInput').addEventListener('change', function(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { try { const contenido = e.target.result, datosImportados = JSON.parse(contenido); if (!Array.isArray(datosImportados)) { throw new Error('Formato de archivo inválido') } if (confirm(`¿Importar ${datosImportados.length} usuarios a Jellyfin? Esto sobrescribirá los datos actuales.`)) { localStorage.setItem(jellyfinConfig.localStorageKey, JSON.stringify(datosImportados)); jellyfinUsers = datosImportados; alert('Datos importados correctamente a Jellyfin'); cargarUsuariosJellyfin() } } catch (error) { console.error('Error al importar:', error); alert('Error al importar el archivo. Verifica que sea un JSON válido.') } }; reader.readAsText(file); event.target.value = '' });
+        closeModal.addEventListener('click', () => { extendModal.style.display = 'none' });
+        cancelExtend.addEventListener('click', () => { extendModal.style.display = 'none' });
+        confirmExtend.addEventListener('click', () => { const dias = parseInt(extendDaysInput.value); if (dias > 0 && currentExtendUserId && currentExtendService) { extenderSuscripcion(currentExtendUserId, dias, currentExtendService) } });
+        extendDaysInput.addEventListener('input', () => { const dias = parseInt(extendDaysInput.value) || 0; if (dias < 1) { extendDaysInput.value = 1; return } let usuario; if (currentExtendService === 'emby') { usuario = embyUsers.find(u => u.id === currentExtendUserId) } else { usuario = jellyfinUsers.find(u => u.id === currentExtendUserId) } if (!usuario) return; const fechaFin = new Date(usuario.endDate), nuevaFecha = new Date(fechaFin); nuevaFecha.setDate(nuevaFecha.getDate() + dias); document.getElementById('modalNewEnd').textContent = formatearFecha(nuevaFecha.toISOString().split('T')[0]) });
+        document.getElementById('embyActiveUsersBtn').addEventListener('click', function() { document.getElementById('embyActiveUsersModal').style.display = 'block'; actualizarUsuariosActivosEmby() });
+        document.querySelector('#embyActiveUsersModal .close-modal').addEventListener('click', () => { document.getElementById('embyActiveUsersModal').style.display = 'none' });
+        document.getElementById('jellyfinActiveUsersBtn').addEventListener('click', function() { document.getElementById('jellyfinActiveUsersModal').style.display = 'block'; actualizarUsuariosActivosJellyfin() });
+        document.querySelector('#jellyfinActiveUsersModal .close-modal').addEventListener('click', () => { document.getElementById('jellyfinActiveUsersModal').style.display = 'none' });
+        document.getElementById('cleanerBtn').addEventListener('click', function() { document.getElementById('devicesModal').style.display = 'block' });
+        document.querySelector('#devicesModal .close-modal').addEventListener('click', () => { document.getElementById('devicesModal').style.display = 'none' });
+        document.getElementById('refreshEmbyDevices').addEventListener('click', function() { loadDevices() });
+        document.getElementById('cleanEmbyDevices').addEventListener('click', function() { cleanInactiveDevices() });
+        document.getElementById('autoCleanEmby').addEventListener('change', function(e) { setupAutoClean(parseInt(e.target.value)) });
+        window.addEventListener('click', (event) => { if (event.target === extendModal) { extendModal.style.display = 'none' } if (event.target === document.getElementById('embyActiveUsersModal')) { document.getElementById('embyActiveUsersModal').style.display = 'none' } if (event.target === document.getElementById('jellyfinActiveUsersModal')) { document.getElementById('jellyfinActiveUsersModal').style.display = 'none' } if (event.target === document.getElementById('devicesModal')) { document.getElementById('devicesModal').style.display = 'none' } });
+        document.getElementById('embySearchInput').addEventListener('input', function(e) { filtrarUsuariosEmby(e.target.value) });
+        document.getElementById('jellyfinSearchInput').addEventListener('input', function(e) { filtrarUsuariosJellyfin(e.target.value) });
+        document.querySelectorAll('.tab').forEach(tab => { tab.addEventListener('click', function() { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); this.classList.add('active'); document.querySelectorAll('.tab-content').forEach(content => { content.classList.remove('active') }); const tabId = this.getAttribute('data-tab'); document.getElementById(`${tabId}-tab`).classList.add('active') }) });
+    </script>
+</body>
+</html>
